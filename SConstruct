@@ -224,6 +224,7 @@ opts.Add(
 )
 
 
+opts.Add(BoolVariable("use_breakpad", "Enable Breakpad crash dump creation.", False))
 # Advanced options
 opts.Add(
     BoolVariable(
@@ -587,6 +588,9 @@ if not env["deprecated"]:
 
 if env["precision"] == "double":
     env.Append(CPPDEFINES=["REAL_T_IS_DOUBLE"])
+
+if env["use_breakpad"]:
+    env.Append(CPPDEFINES=["USE_BREAKPAD"])
 
 # Library Support
 if env["library_type"] != "executable":
