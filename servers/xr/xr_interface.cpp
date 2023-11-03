@@ -175,71 +175,67 @@ int XRInterface::get_camera_feed_id() {
 	return 0;
 }
 
+Vector2 XRInterface::get_eye_focus(uint32_t p_view, float p_aspect) {
+	// Our near and far don't matter much for what we're doing here,
+	// but there are some interfaces that will remember this as the near and far and may fail as a result...
+
+	Projection cm = get_projection_for_view(p_view, p_aspect, 0.1, 1000.0);
+	Vector3 center = cm.xform(Vector3(0.0, 0.0, 999.0));
+
+	return Vector2(center.x, center.y);
+}
+
 RID XRInterface::get_vrs_texture() {
 	// Default logic will return a standard VRS image based on our target size and default projections.
 	// Note that this only gets called if VRS is supported on the hardware.
 
 	int32_t texel_width = RD::get_singleton()->limit_get(RD::LIMIT_VRS_TEXEL_WIDTH);
 	int32_t texel_height = RD::get_singleton()->limit_get(RD::LIMIT_VRS_TEXEL_HEIGHT);
+	float vrs_strength = 1.0; // TODO: We should make this configurable...
 	int view_count = get_view_count();
 	Size2 target_size = get_render_target_size();
 	real_t aspect = target_size.x / target_size.y; // is this y/x ?
 	Size2 vrs_size = Size2(round(0.5 + target_size.x / texel_width), round(0.5 + target_size.y / texel_height));
-	real_t radius = vrs_size.length() * 0.5;
+	real_t radius = MAX(vrs_size.x, vrs_size.y) * 0.5 / vrs_strength;
 	Size2 vrs_sizei = vrs_size;
 
-	if (vrs.size != vrs_sizei) {
-		const uint8_t densities[] = {
-			0, // 1x1
-			1, // 1x2
-			// 2, // 1x4 - not supported
-			// 3, // 1x8 - not supported
-			// 4, // 2x1
-			5, // 2x2
-			6, // 2x4
-			// 9, // 4x2
-			10, // 4x4
-		};
+	// Our density map is now unified, with a value of (0.0, 0.0) meaning a 1x1 texel size and (1.0, 1.0) an max texel size.
+	// For our standard VRS extension on Vulkan this means a maximum of 8x8.
+	// For the density map extension this scales depending on the max texel size.
 
-		// out with the old
+	if (vrs.size != vrs_sizei) {
+		// Out with the old.
 		if (vrs.vrs_texture.is_valid()) {
 			RS::get_singleton()->free(vrs.vrs_texture);
 			vrs.vrs_texture = RID();
 		}
 
-		// in with the new
+		// In with the new.
 		Vector<Ref<Image>> images;
 		vrs.size = vrs_sizei;
 
 		for (int i = 0; i < view_count && i < 2; i++) {
 			PackedByteArray data;
-			data.resize(vrs_sizei.x * vrs_sizei.y);
+			data.resize(vrs_sizei.x * vrs_sizei.y * 2);
 			uint8_t *data_ptr = data.ptrw();
 
-			// Our near and far don't matter much for what we're doing here, but there are some interfaces that will remember this as the near and far and may fail as a result...
-			Projection cm = get_projection_for_view(i, aspect, 0.1, 1000.0);
-			Vector3 center = cm.xform(Vector3(0.0, 0.0, 999.0));
-
+			Vector2 eye_focus = get_eye_focus(i, aspect);
 			Vector2i view_center;
-			view_center.x = int(vrs_size.x * (center.x + 1.0) * 0.5);
-			view_center.y = int(vrs_size.y * (center.y + 1.0) * 0.5);
+			view_center.x = int(vrs_size.x * (eye_focus.x + 1.0) * 0.5);
+			view_center.y = int(vrs_size.y * (eye_focus.y + 1.0) * 0.5);
 
 			int d = 0;
 			for (int y = 0; y < vrs_sizei.y; y++) {
 				for (int x = 0; x < vrs_sizei.x; x++) {
 					Vector2 offset = Vector2(x - view_center.x, y - view_center.y);
 					offset.y *= aspect;
-					real_t distance = offset.length();
-					int idx = round(5.0 * distance / radius);
-					if (idx > 4) {
-						idx = 4;
-					}
-					uint8_t density = densities[idx];
-
-					data_ptr[d++] = density;
+					real_t density = 255.0 * abs(offset.x) / radius;
+					data_ptr[d++] = MIN(255, density);
+					density = 255.0 * abs(offset.y) / radius;
+					data_ptr[d++] = MIN(255, density);
 				}
 			}
-			images.push_back(Image::create_from_data(vrs_sizei.x, vrs_sizei.y, false, Image::FORMAT_R8, data));
+			images.push_back(Image::create_from_data(vrs_sizei.x, vrs_sizei.y, false, Image::FORMAT_RG8, data));
 		}
 
 		if (images.size() == 1) {

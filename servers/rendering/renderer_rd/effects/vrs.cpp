@@ -32,10 +32,7 @@
 #include "../renderer_compositor_rd.h"
 #include "../storage_rd/texture_storage.h"
 #include "../uniform_set_cache_rd.h"
-
-#ifndef _3D_DISABLED
 #include "servers/xr_server.h"
-#endif // _3D_DISABLED
 
 using namespace RendererRD;
 
@@ -43,7 +40,9 @@ VRS::VRS() {
 	{
 		Vector<String> vrs_modes;
 		vrs_modes.push_back("\n"); // VRS_DEFAULT
-		vrs_modes.push_back("\n#define USE_MULTIVIEW\n"); // VRS_MULTIVIEW
+		vrs_modes.push_back("\n#define MULTIVIEW\n"); // VRS_MULTIVIEW
+		vrs_modes.push_back("\n#define SPLIT_RG\n"); // VRS_RG
+		vrs_modes.push_back("\n#define SPLIT_RG\n#define MULTIVIEW\n"); // VRS_RG_MULTIVIEW
 
 		vrs_shader.shader.initialize(vrs_modes);
 
@@ -80,7 +79,10 @@ void VRS::copy_vrs(RID p_source_rd_texture, RID p_dest_framebuffer, bool p_multi
 
 	RD::Uniform u_source_rd_texture(RD::UNIFORM_TYPE_SAMPLER_WITH_TEXTURE, 0, Vector<RID>({ default_sampler, p_source_rd_texture }));
 
-	VRSMode mode = p_multiview ? VRS_MULTIVIEW : VRS_DEFAULT;
+	int mode = p_multiview ? VRS_MULTIVIEW : VRS_DEFAULT;
+	if (!RD::get_singleton()->has_feature(RD::SUPPORTS_ATTACHMENT_VRS) && RD::get_singleton()->has_feature(RD::SUPPORTS_ATTACHMENT_FD)) {
+		mode += VRS_RG;
+	}
 
 	RID shader = vrs_shader.shader.version_get_shader(vrs_shader.shader_version, mode);
 	ERR_FAIL_COND(shader.is_null());
@@ -111,11 +113,10 @@ Size2i VRS::get_vrs_texture_size(const Size2i p_base_size) const {
 void VRS::update_vrs_texture(RID p_vrs_fb, RID p_render_target) {
 	TextureStorage *texture_storage = TextureStorage::get_singleton();
 	RS::ViewportVRSMode vrs_mode = texture_storage->render_target_get_vrs_mode(p_render_target);
+	RS::ViewportVRSUpdateMode vrs_update_mode = texture_storage->render_target_get_vrs_update_mode(p_render_target);
 
-	if (vrs_mode != RS::VIEWPORT_VRS_DISABLED) {
+	if (vrs_mode != RS::VIEWPORT_VRS_DISABLED && vrs_update_mode != RS::VIEWPORT_VRS_UPDATE_DISABLED) {
 		RD::get_singleton()->draw_command_begin_label("VRS Setup");
-
-		// TODO figure out if image has changed since it was last copied so we can save some resources..
 
 		if (vrs_mode == RS::VIEWPORT_VRS_TEXTURE) {
 			RID vrs_texture = texture_storage->render_target_get_vrs_texture(p_render_target);
@@ -127,7 +128,6 @@ void VRS::update_vrs_texture(RID p_vrs_fb, RID p_render_target) {
 					copy_vrs(rd_texture, p_vrs_fb, layers > 1);
 				}
 			}
-#ifndef _3D_DISABLED
 		} else if (vrs_mode == RS::VIEWPORT_VRS_XR) {
 			Ref<XRInterface> interface = XRServer::get_singleton()->get_primary_interface();
 			if (interface.is_valid()) {
@@ -142,7 +142,10 @@ void VRS::update_vrs_texture(RID p_vrs_fb, RID p_render_target) {
 					}
 				}
 			}
-#endif // _3D_DISABLED
+		}
+
+		if (vrs_update_mode == RS::VIEWPORT_VRS_UPDATE_ONCE) {
+			texture_storage->render_target_set_vrs_update_mode(p_render_target, RS::VIEWPORT_VRS_UPDATE_DISABLED);
 		}
 
 		RD::get_singleton()->draw_command_end_label();

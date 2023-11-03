@@ -127,6 +127,7 @@ public:
 	virtual Transform3D get_camera_transform() = 0; /* returns the position of our camera for updating our camera node. For monoscopic this is equal to the views transform, for stereoscopic this should be an average */
 	virtual Transform3D get_transform_for_view(uint32_t p_view, const Transform3D &p_cam_transform) = 0; /* get each views transform */
 	virtual Projection get_projection_for_view(uint32_t p_view, double p_aspect, double p_z_near, double p_z_far) = 0; /* get each view projection matrix */
+	virtual Vector2 get_eye_focus(uint32_t p_view, float p_aspect); /* Obtain eye focus (if supported) in 2D space NDC coordinates to given view */
 	virtual RID get_vrs_texture(); /* obtain VRS texture */
 	virtual RID get_color_texture(); /* obtain color output texture (if applicable) */
 	virtual RID get_depth_texture(); /* obtain depth output texture (if applicable, used for reprojection) */
