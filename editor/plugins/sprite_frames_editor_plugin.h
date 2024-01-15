@@ -115,7 +115,8 @@ class SpriteFramesEditor : public HSplitContainer {
 	SpinBox *frame_duration = nullptr;
 	ItemList *frame_list = nullptr;
 	bool loading_scene;
-	int sel;
+	Vector<int> selections;
+	Vector<Ref<EditorSpriteFramesFrame>> frame_clipboard;
 
 	Button *add_anim = nullptr;
 	Button *delete_anim = nullptr;
@@ -209,7 +210,7 @@ class SpriteFramesEditor : public HSplitContainer {
 	void _animation_speed_changed(double p_value);
 
 	void _frame_list_gui_input(const Ref<InputEvent> &p_event);
-	void _frame_list_item_selected(int p_index);
+	void _frame_list_item_selected(int p_index, bool p_selected);
 
 	void _zoom_in();
 	void _zoom_out();
