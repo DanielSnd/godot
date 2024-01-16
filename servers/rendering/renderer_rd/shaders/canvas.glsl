@@ -256,6 +256,201 @@ float texture_sdf(vec2 p_sdf) {
 	return d * canvas_data.tex_to_sdf;
 }
 
+vec4 texture_sample_shadow_other(vec4 p_sdf) {
+	uint light_count = (draw_data.flags >> FLAGS_LIGHT_COUNT_SHIFT) & 0xF; //max 16 lights
+	float return_sample = 0.0;
+
+	vec2 use_vertex = (canvas_data.canvas_transform * vec4(p_sdf.x,p_sdf.y, 0.0, 1.0)).xy;
+	uint desired_light = uint(round(p_sdf.z));
+	if (desired_light < MAX_LIGHTS_PER_ITEM && desired_light < light_count) {
+		uint i = desired_light;
+		uint light_base = draw_data.lights[desired_light >> 2];
+		light_base >>= (desired_light & 3) * 8;
+		light_base &= 0xFF;
+		float shadow_return = 1.0;
+		vec2 tex_uv = (vec4(p_sdf.x,p_sdf.y, 0.0, 1.0) * mat4(light_array.data[light_base].texture_matrix[0], light_array.data[light_base].texture_matrix[1], vec4(0.0, 0.0, 1.0, 0.0), vec4(0.0, 0.0, 0.0, 1.0))).xy;//multiply inverse given its transposed. Optimizer removes useless operations.
+		vec2 tex_uv_atlas = tex_uv * light_array.data[light_base].atlas_rect.zw + light_array.data[light_base].atlas_rect.xy;
+		vec4 light_color = textureLod(sampler2D(atlas_texture, texture_sampler), tex_uv_atlas, 0.0);
+		vec4 light_base_color = light_array.data[light_base].color;
+
+		shadow_return = light_color.a * light_base_color.a;
+
+		if (any(lessThan(tex_uv, vec2(0.0, 0.0))) || any(greaterThanEqual(tex_uv, vec2(1.0, 1.0)))) {
+			//if outside the light texture, light color is zero
+			shadow_return = 0.0;
+		}
+
+		if (bool(light_array.data[light_base].flags & LIGHT_FLAGS_HAS_SHADOW)) {
+			vec2 shadow_pos = (vec4(p_sdf.x,p_sdf.y, 0.0, 1.0) * mat4(light_array.data[light_base].shadow_matrix[0], light_array.data[light_base].shadow_matrix[1], vec4(0.0, 0.0, 1.0, 0.0), vec4(0.0, 0.0, 0.0, 1.0))).xy;//multiply inverse given its transposed. Optimizer removes useless operations.
+			vec2 pos_norm = normalize(shadow_pos);
+			vec2 pos_abs = abs(pos_norm);
+			vec2 pos_box = pos_norm / max(pos_abs.x, pos_abs.y);
+			vec2 pos_rot = pos_norm * mat2(vec2(0.7071067811865476, -0.7071067811865476), vec2(0.7071067811865476, 0.7071067811865476));//is there a faster way to 45 degrees rot?
+			float tex_ofs;
+			float distance;
+			if (pos_rot.y > 0) {
+				if (pos_rot.x > 0) {
+					tex_ofs = pos_box.y * 0.125 + 0.125;
+					distance = shadow_pos.x;
+				} else {
+					tex_ofs = pos_box.x * -0.125 + (0.25 + 0.125);
+					distance = shadow_pos.y;
+				}
+			} else {
+				if (pos_rot.x < 0) {
+					tex_ofs = pos_box.y * -0.125 + (0.5 + 0.125);
+					distance = -shadow_pos.x;
+				} else {
+					tex_ofs = pos_box.x * 0.125 + (0.75 + 0.125);
+					distance = -shadow_pos.y;
+				}
+			}
+
+			distance *= light_array.data[light_base].shadow_zfar_inv;
+
+			//float distance = length(shadow_pos);
+			vec4 shadow_uv = vec4(tex_ofs, light_array.data[light_base].shadow_y_ofs, distance, 1.0);
+
+			uint shadow_mode = light_array.data[light_base].flags & LIGHT_FLAGS_FILTER_MASK;
+
+			vec4 shadow_pixel_size = vec4(light_array.data[light_base].shadow_pixel_size, 0.0, 0.0, 0.0);
+			vec4 shadow_color = unpackUnorm4x8(light_array.data[light_base].shadow_color);
+			shadow_color.a *= light_color.a;
+			float found_shadow = textureProjLod(sampler2D(shadow_atlas_texture, shadow_sampler), shadow_uv, 0.0).x;
+
+			#ifdef TAKE_ALL_SHADOWS
+			if (found_shadow >= 0.0 && fract(found_shadow) < shadow_uv.z) {
+				found_shadow = shadow_uv.z;
+			}
+			#else
+			if (found_shadow > draw_data.z_index && fract(found_shadow) < shadow_uv.z) {
+				found_shadow = 1.0;
+			}
+			#endif
+			light_color.a = mix(light_color.a, shadow_color.a, found_shadow);
+			return_sample += light_color.a;
+			return vec4(found_shadow,light_color.a,shadow_color.a,draw_data.z_index);
+		}
+	}
+	return vec4(0.0,0.0,0.0,0.0);
+}
+
+vec4 texture_sample_shadow(vec2 p_sdf) {
+	uint light_count = (draw_data.flags >> FLAGS_LIGHT_COUNT_SHIFT) & 0xF; //max 16 lights
+	float return_sample = 0.0;
+	vec4 color = vec4(1.0);
+	float light_only_alpha = 0.0;
+	p_sdf = (canvas_data.canvas_transform * vec4(p_sdf, 0.0, 1.0)).xy;
+	for (uint i = 0; i < canvas_data.directional_light_count; i++) {
+		uint light_base = i;
+
+		vec2 direction = light_array.data[light_base].position;
+		vec4 light_color = light_array.data[light_base].color;
+
+		if (bool(light_array.data[light_base].flags & LIGHT_FLAGS_HAS_SHADOW)) {
+			vec2 shadow_pos = (vec4(p_sdf, 0.0, 1.0) * mat4(light_array.data[light_base].shadow_matrix[0], light_array.data[light_base].shadow_matrix[1], vec4(0.0, 0.0, 1.0, 0.0), vec4(0.0, 0.0, 0.0, 1.0))).xy; //multiply inverse given its transposed. Optimizer removes useless operations.
+
+			vec4 shadow_uv = vec4(shadow_pos.x, light_array.data[light_base].shadow_y_ofs, shadow_pos.y * light_array.data[light_base].shadow_zfar_inv, 1.0);
+			float shadow;
+			uint shadow_mode = light_array.data[light_base].flags & LIGHT_FLAGS_FILTER_MASK;
+
+			shadow = textureProjLod(sampler2DShadow(shadow_atlas_texture, shadow_sampler), shadow_uv, 0.0).x;
+
+			vec4 shadow_color = unpackUnorm4x8(light_array.data[light_base].shadow_color);
+			shadow_color.a *= light_color.a; //respect light alpha
+
+			light_color = mix(light_color, shadow_color, shadow);
+		}
+
+		color.rgb = mix(color.rgb, light_color.rgb, light_color.a);
+		light_only_alpha += light_color.a;
+	}
+
+	float return_found_shadow = 0.0;
+
+	float return_found_shadow_uv_z = 0.0;
+
+	for (uint i = 0; i < MAX_LIGHTS_PER_ITEM; i++) {
+		if (i >= light_count) {
+			break;
+		}
+		uint light_base = draw_data.lights[i >> 2];
+		light_base >>= (i & 3) * 8;
+		light_base &= 0xFF;
+		float shadow_return = 1.0;
+		vec2 tex_uv = (vec4(p_sdf, 0.0, 1.0) * mat4(light_array.data[light_base].texture_matrix[0], light_array.data[light_base].texture_matrix[1], vec4(0.0, 0.0, 1.0, 0.0), vec4(0.0, 0.0, 0.0, 1.0))).xy;//multiply inverse given its transposed. Optimizer removes useless operations.
+		vec2 tex_uv_atlas = tex_uv * light_array.data[light_base].atlas_rect.zw + light_array.data[light_base].atlas_rect.xy;
+		vec4 light_color = textureLod(sampler2D(atlas_texture, texture_sampler), tex_uv_atlas, 0.0);
+		vec4 light_base_color = light_array.data[light_base].color;
+
+		shadow_return = light_color.a * light_base_color.a;
+
+		if (any(lessThan(tex_uv, vec2(0.0, 0.0))) || any(greaterThanEqual(tex_uv, vec2(1.0, 1.0)))) {
+			//if outside the light texture, light color is zero
+			shadow_return = 0.0;
+		}
+
+		if (bool(light_array.data[light_base].flags & LIGHT_FLAGS_HAS_SHADOW)) {
+			vec2 shadow_pos = (vec4(p_sdf, 0.0, 1.0) * mat4(light_array.data[light_base].shadow_matrix[0], light_array.data[light_base].shadow_matrix[1], vec4(0.0, 0.0, 1.0, 0.0), vec4(0.0, 0.0, 0.0, 1.0))).xy;//multiply inverse given its transposed. Optimizer removes useless operations.
+			vec2 pos_norm = normalize(shadow_pos);
+			vec2 pos_abs = abs(pos_norm);
+			vec2 pos_box = pos_norm / max(pos_abs.x, pos_abs.y);
+			vec2 pos_rot = pos_norm * mat2(vec2(0.7071067811865476, -0.7071067811865476), vec2(0.7071067811865476, 0.7071067811865476));//is there a faster way to 45 degrees rot?
+			float tex_ofs;
+			float distance;
+			if (pos_rot.y > 0) {
+				if (pos_rot.x > 0) {
+					tex_ofs = pos_box.y * 0.125 + 0.125;
+					distance = shadow_pos.x;
+				} else {
+					tex_ofs = pos_box.x * -0.125 + (0.25 + 0.125);
+					distance = shadow_pos.y;
+				}
+			} else {
+				if (pos_rot.x < 0) {
+					tex_ofs = pos_box.y * -0.125 + (0.5 + 0.125);
+					distance = -shadow_pos.x;
+				} else {
+					tex_ofs = pos_box.x * 0.125 + (0.75 + 0.125);
+					distance = -shadow_pos.y;
+				}
+			}
+
+			distance *= light_array.data[light_base].shadow_zfar_inv;
+
+			//float distance = length(shadow_pos);
+			vec4 shadow_uv = vec4(tex_ofs, light_array.data[light_base].shadow_y_ofs, distance, 1.0);
+
+			uint shadow_mode = light_array.data[light_base].flags & LIGHT_FLAGS_FILTER_MASK;
+
+			vec4 shadow_pixel_size = vec4(light_array.data[light_base].shadow_pixel_size, 0.0, 0.0, 0.0);
+			vec4 shadow_color = unpackUnorm4x8(light_array.data[light_base].shadow_color);
+			shadow_color.a *= light_color.a;
+			float found_shadow = textureProjLod(sampler2D(shadow_atlas_texture, shadow_sampler), shadow_uv, 0.0).x;
+			return_found_shadow_uv_z = shadow_uv.z;
+			return_found_shadow += found_shadow;
+			#ifdef TAKE_ALL_SHADOWS
+			if (found_shadow >= 0.0 && fract(found_shadow) < shadow_uv.z) {
+				found_shadow = 0.0;
+			}
+			#else
+			if (found_shadow > draw_data.z_index && fract(found_shadow) < shadow_uv.z) {
+				found_shadow = 1.0;
+			}
+			#endif
+			light_color.a = mix(light_color.a, shadow_color.a, found_shadow);
+			return_sample += light_color.a;
+		}
+
+		color.rgb = mix(color.rgb, light_color.rgb, light_color.a);
+		light_only_alpha += light_color.a;
+	}
+	color.g = return_found_shadow_uv_z;
+	color.b = return_found_shadow;
+	color.a = return_sample;
+	return color;
+}
+
 vec2 texture_sdf_normal(vec2 p_sdf) {
 	vec2 uv = p_sdf * canvas_data.sdf_to_tex.xy + canvas_data.sdf_to_tex.zw;
 
@@ -368,11 +563,12 @@ vec3 light_normal_compute(vec3 light_vec, vec3 normal, vec3 base_color, vec3 lig
 		return light_color * base_color * cNdotL;
 	}
 }
+
 float layeredShadowSample(vec4 shadow_uv) {
 	float shadow_value = textureProjLod(sampler2D(shadow_atlas_texture, shadow_sampler), shadow_uv, 0.0).x;
 
 	#ifdef TAKE_ALL_SHADOWS
-	if (shadow_value > 0.0 && fract(shadow_value) < shadow_uv.z) {
+	if (shadow_value >= 0.0 && fract(shadow_value) < shadow_uv.z) {
 		return shadow_uv.z;
 	}
 	#endif
@@ -427,7 +623,11 @@ vec4 light_shadow_compute_positional(uint light_base, vec4 light_color, vec4 sha
 #ifdef LIGHT_CODE_USED
 	shadow_color.rgb *= shadow_modulate;
 #endif
+#ifdef TAKE_ALL_SHADOWS
+	shadow_color.a *= light_color.a; //respect light alpha
 
+	return mix(light_color, shadow_color, shadow);
+#endif
 	shadow_color.a *= light_color.a; //respect light alpha
 
 	return mix(light_color, shadow_color, shadow);
@@ -684,7 +884,6 @@ void main() {
 			);
 		}
 
-		light_blend_compute(light_base, light_color, color.rgb);
 #ifdef MODE_LIGHT_ONLY
 		light_only_alpha += light_color.a;
 #endif

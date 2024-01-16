@@ -285,6 +285,15 @@ ShaderTypes::ShaderTypes() {
 		shader_modes[RS::SHADER_CANVAS_ITEM].functions["light"].stage_functions["sdf_to_screen_uv"] = func;
 		shader_modes[RS::SHADER_CANVAS_ITEM].functions["fragment"].stage_functions["texture_sdf_normal"] = func;
 		shader_modes[RS::SHADER_CANVAS_ITEM].functions["light"].stage_functions["texture_sdf_normal"] = func;
+		func.return_type = ShaderLanguage::TYPE_VEC4; //whether it could emit
+		shader_modes[RS::SHADER_CANVAS_ITEM].functions["fragment"].stage_functions["texture_sample_shadow"] = func;
+		func.return_type = ShaderLanguage::TYPE_VEC2; //whether it could emit
+	}
+	{
+		ShaderLanguage::StageFunctionInfo func;
+		func.arguments.push_back(ShaderLanguage::StageFunctionInfo::Argument("sampling", ShaderLanguage::TYPE_VEC4));
+		func.return_type = ShaderLanguage::TYPE_VEC4; //whether it could emit
+		shader_modes[RS::SHADER_CANVAS_ITEM].functions["fragment"].stage_functions["texture_sample_shadow_other"] = func;
 	}
 
 	{
