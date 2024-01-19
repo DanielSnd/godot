@@ -764,7 +764,7 @@ void RasterizerSceneGLES3::_setup_sky(const RenderDataGLES3 *p_render_data, cons
 	}
 }
 
-void RasterizerSceneGLES3::_draw_sky(RID p_env, const Projection &p_projection, const Transform3D &p_transform, float p_luminance_multiplier, bool p_use_multiview, bool p_flip_y) {
+void RasterizerSceneGLES3::_draw_sky(RID p_env, const Projection &p_projection, const Transform3D &p_transform, float p_sky_energy_multiplier, float p_luminance_multiplier, bool p_use_multiview, bool p_flip_y, bool p_apply_color_adjustments_in_post) {
 	GLES3::MaterialStorage *material_storage = GLES3::MaterialStorage::get_singleton();
 	ERR_FAIL_COND(p_env.is_null());
 
@@ -777,6 +777,10 @@ void RasterizerSceneGLES3::_draw_sky(RID p_env, const Projection &p_projection, 
 	uint64_t spec_constants = p_use_multiview ? SkyShaderGLES3::USE_MULTIVIEW : 0;
 	if (p_flip_y) {
 		spec_constants |= SkyShaderGLES3::USE_INVERTED_Y;
+	}
+	if (!p_apply_color_adjustments_in_post) {
+		spec_constants |= SkyShaderGLES3::APPLY_TONEMAPPING;
+		// TODO add BCS and color corrections once supported.
 	}
 
 	RS::EnvironmentBG background = environment_get_background(p_env);
@@ -832,6 +836,7 @@ void RasterizerSceneGLES3::_draw_sky(RID p_env, const Projection &p_projection, 
 	material_storage->shaders.sky_shader.version_set_uniform(SkyShaderGLES3::PROJECTION, camera.columns[2][0], camera.columns[0][0], camera.columns[2][1], camera.columns[1][1], shader_data->version, SkyShaderGLES3::MODE_BACKGROUND, spec_constants);
 	material_storage->shaders.sky_shader.version_set_uniform(SkyShaderGLES3::POSITION, p_transform.origin, shader_data->version, SkyShaderGLES3::MODE_BACKGROUND, spec_constants);
 	material_storage->shaders.sky_shader.version_set_uniform(SkyShaderGLES3::TIME, time, shader_data->version, SkyShaderGLES3::MODE_BACKGROUND, spec_constants);
+	material_storage->shaders.sky_shader.version_set_uniform(SkyShaderGLES3::SKY_ENERGY_MULTIPLIER, p_sky_energy_multiplier, shader_data->version, SkyShaderGLES3::MODE_BACKGROUND, spec_constants);
 	material_storage->shaders.sky_shader.version_set_uniform(SkyShaderGLES3::LUMINANCE_MULTIPLIER, p_luminance_multiplier, shader_data->version, SkyShaderGLES3::MODE_BACKGROUND, spec_constants);
 
 	if (p_use_multiview) {
@@ -843,7 +848,7 @@ void RasterizerSceneGLES3::_draw_sky(RID p_env, const Projection &p_projection, 
 	glDrawArrays(GL_TRIANGLES, 0, 3);
 }
 
-void RasterizerSceneGLES3::_update_sky_radiance(RID p_env, const Projection &p_projection, const Transform3D &p_transform, float p_luminance_multiplier) {
+void RasterizerSceneGLES3::_update_sky_radiance(RID p_env, const Projection &p_projection, const Transform3D &p_transform, float p_sky_energy_multiplier) {
 	GLES3::MaterialStorage *material_storage = GLES3::MaterialStorage::get_singleton();
 	ERR_FAIL_COND(p_env.is_null());
 
@@ -939,7 +944,8 @@ void RasterizerSceneGLES3::_update_sky_radiance(RID p_env, const Projection &p_p
 		material_storage->shaders.sky_shader.version_set_uniform(SkyShaderGLES3::POSITION, p_transform.origin, shader_data->version, SkyShaderGLES3::MODE_CUBEMAP);
 		material_storage->shaders.sky_shader.version_set_uniform(SkyShaderGLES3::TIME, time, shader_data->version, SkyShaderGLES3::MODE_CUBEMAP);
 		material_storage->shaders.sky_shader.version_set_uniform(SkyShaderGLES3::PROJECTION, cm.columns[2][0], cm.columns[0][0], cm.columns[2][1], cm.columns[1][1], shader_data->version, SkyShaderGLES3::MODE_CUBEMAP);
-		material_storage->shaders.sky_shader.version_set_uniform(SkyShaderGLES3::LUMINANCE_MULTIPLIER, p_luminance_multiplier, shader_data->version, SkyShaderGLES3::MODE_CUBEMAP);
+		material_storage->shaders.sky_shader.version_set_uniform(SkyShaderGLES3::SKY_ENERGY_MULTIPLIER, p_sky_energy_multiplier, shader_data->version, SkyShaderGLES3::MODE_CUBEMAP);
+		material_storage->shaders.sky_shader.version_set_uniform(SkyShaderGLES3::LUMINANCE_MULTIPLIER, 1.0, shader_data->version, SkyShaderGLES3::MODE_CUBEMAP);
 
 		glBindVertexArray(sky_globals.screen_triangle_array);
 
@@ -969,7 +975,7 @@ void RasterizerSceneGLES3::_update_sky_radiance(RID p_env, const Projection &p_p
 			_filter_sky_radiance(sky, 0); //Just copy over the first mipmap
 		}
 		sky->processing_layer = 1;
-		sky->baked_exposure = p_luminance_multiplier;
+		sky->baked_exposure = p_sky_energy_multiplier;
 		sky->reflection_dirty = false;
 	} else {
 		if (sky_mode == RS::SKY_MODE_INCREMENTAL && sky->processing_layer < max_processing_layer) {
@@ -1583,6 +1589,8 @@ void RasterizerSceneGLES3::_setup_environment(const RenderDataGLES3 *p_render_da
 	Size2 screen_pixel_size = Vector2(1.0, 1.0) / Size2(p_screen_size);
 	scene_state.ubo.screen_pixel_size[0] = screen_pixel_size.x;
 	scene_state.ubo.screen_pixel_size[1] = screen_pixel_size.y;
+
+	scene_state.ubo.luminance_multiplier = p_render_data->luminance_multiplier;
 
 	scene_state.ubo.shadow_bias = p_shadow_bias;
 	scene_state.ubo.pancake_shadows = p_pancake_shadows;
@@ -2311,14 +2319,31 @@ void RasterizerSceneGLES3::render_scene(const Ref<RenderSceneBuffers> &p_render_
 	GLES3::Config *config = GLES3::Config::get_singleton();
 	RENDER_TIMESTAMP("Setup 3D Scene");
 
+	bool apply_color_adjustments_in_post = false;
+
 	Ref<RenderSceneBuffersGLES3> rb;
 	if (p_render_buffers.is_valid()) {
 		rb = p_render_buffers;
 		ERR_FAIL_COND(rb.is_null());
+
+		if (rb->get_scaling_3d_mode() != RS::VIEWPORT_SCALING_3D_MODE_OFF) {
+			// If we're scaling, we apply tonemapping etc. in post, so disable it during rendering
+			apply_color_adjustments_in_post = true;
+		}
 	}
 
 	GLES3::RenderTarget *rt = texture_storage->get_render_target(rb->render_target);
 	ERR_FAIL_NULL(rt);
+
+	bool glow_enabled = false;
+	if (p_environment.is_valid() && rb.is_valid()) {
+		glow_enabled = environment_get_glow_enabled(p_environment);
+		rb->set_glow_enabled(glow_enabled); // ensure our intermediate buffer is available if glow is enabled
+		if (glow_enabled) {
+			// If glow is enabled, we apply tonemapping etc. in post, so disable it during rendering
+			apply_color_adjustments_in_post = true;
+		}
+	}
 
 	// Assign render data
 	// Use the format from rendererRD
@@ -2354,6 +2379,13 @@ void RasterizerSceneGLES3::render_scene(const Ref<RenderSceneBuffers> &p_render_
 
 		// this should be the same for all cameras..
 		render_data.lod_distance_multiplier = p_camera_data->main_projection.get_lod_multiplier();
+
+		if (rt->color_type == GL_UNSIGNED_INT_2_10_10_10_REV && glow_enabled) {
+			// As our output is in sRGB and we're using 10bit color space, we can fake a little HDR to do glow...
+			render_data.luminance_multiplier = 0.25;
+		} else {
+			render_data.luminance_multiplier = 1.0;
+		}
 
 		if (get_debug_draw_mode() == RS::VIEWPORT_DEBUG_DRAW_DISABLE_LOD) {
 			render_data.screen_mesh_lod_threshold = 0.0;
@@ -2566,9 +2598,10 @@ void RasterizerSceneGLES3::render_scene(const Ref<RenderSceneBuffers> &p_render_
 	}
 	scene_state.current_blend_mode = GLES3::SceneShaderData::BLEND_MODE_MIX;
 
+	glDisable(GL_SCISSOR_TEST);
+	glDepthMask(GL_TRUE);
 	glEnable(GL_DEPTH_TEST);
 	glDepthFunc(GL_LEQUAL);
-	glDepthMask(GL_TRUE);
 	scene_state.current_depth_test = GLES3::SceneShaderData::DEPTH_TEST_ENABLED;
 	scene_state.current_depth_draw = GLES3::SceneShaderData::DEPTH_DRAW_ALWAYS;
 
@@ -2585,7 +2618,19 @@ void RasterizerSceneGLES3::render_scene(const Ref<RenderSceneBuffers> &p_render_
 	if (!keep_color) {
 		clear_color.a = render_data.transparent_bg ? 0.0f : 1.0f;
 		glClearBufferfv(GL_COLOR, 0, clear_color.components);
+	} else if (fbo != rt->fbo) {
+		// Need to copy our current contents to our intermediate/MSAA buffer
+		GLES3::CopyEffects *copy_effects = GLES3::CopyEffects::get_singleton();
+
+		glDisable(GL_DEPTH_TEST);
+		glDepthMask(GL_FALSE);
+
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(rt->view_count > 1 ? GL_TEXTURE_2D_ARRAY : GL_TEXTURE_2D, rt->color);
+
+		copy_effects->copy_screen(render_data.luminance_multiplier);
 	}
+
 	RENDER_TIMESTAMP("Render Opaque Pass");
 	uint64_t spec_constant_base_flags = 0;
 
@@ -2597,6 +2642,12 @@ void RasterizerSceneGLES3::render_scene(const Ref<RenderSceneBuffers> &p_render_
 
 		if (render_data.environment.is_null() || (render_data.environment.is_valid() && !environment_get_fog_enabled(render_data.environment))) {
 			spec_constant_base_flags |= SceneShaderGLES3::DISABLE_FOG;
+		}
+
+		if (!apply_color_adjustments_in_post) {
+			spec_constant_base_flags |= SceneShaderGLES3::APPLY_TONEMAPPING;
+
+			// TODO add BCS and Color corrections here once supported.
 		}
 	}
 	// Render Opaque Objects.
@@ -2617,7 +2668,7 @@ void RasterizerSceneGLES3::render_scene(const Ref<RenderSceneBuffers> &p_render_
 		scene_state.current_depth_test = GLES3::SceneShaderData::DEPTH_TEST_ENABLED;
 		scene_state.cull_mode = GLES3::SceneShaderData::CULL_BACK;
 
-		_draw_sky(render_data.environment, render_data.cam_projection, render_data.cam_transform, sky_energy_multiplier, p_camera_data->view_count > 1, flip_y);
+		_draw_sky(render_data.environment, render_data.cam_projection, render_data.cam_transform, sky_energy_multiplier, render_data.luminance_multiplier, p_camera_data->view_count > 1, flip_y, apply_color_adjustments_in_post);
 	}
 
 	if (scene_state.used_screen_texture || scene_state.used_depth_texture) {
@@ -2692,6 +2743,9 @@ void RasterizerSceneGLES3::render_scene(const Ref<RenderSceneBuffers> &p_render_
 
 void RasterizerSceneGLES3::_render_post_processing(const RenderDataGLES3 *p_render_data) {
 	GLES3::TextureStorage *texture_storage = GLES3::TextureStorage::get_singleton();
+	GLES3::Glow *glow = GLES3::Glow::get_singleton();
+	GLES3::PostEffects *post_effects = GLES3::PostEffects::get_singleton();
+
 	Ref<RenderSceneBuffersGLES3> rb = p_render_data->render_buffers;
 	ERR_FAIL_COND(rb.is_null());
 
@@ -2705,6 +2759,26 @@ void RasterizerSceneGLES3::_render_post_processing(const RenderDataGLES3 *p_rend
 	GLuint fbo_msaa_3d = rb->get_msaa3d_fbo();
 	GLuint fbo_int = rb->get_internal_fbo();
 	GLuint fbo_rt = texture_storage->render_target_get_fbo(render_target); // TODO if MSAA 2D is enabled and we're not using rt_msaa, get 2D render target here.
+
+	// Check if we have glow enabled and if so, check if our buffers were allocated
+	bool glow_enabled = false;
+	float glow_intensity = 1.0;
+	float glow_bloom = 0.0;
+	float glow_hdr_bleed_threshold = 1.0;
+	float glow_hdr_bleed_scale = 2.0;
+	float glow_hdr_luminance_cap = 12.0;
+	if (p_render_data->environment.is_valid()) {
+		glow_enabled = environment_get_glow_enabled(p_render_data->environment);
+		glow_intensity = environment_get_glow_intensity(p_render_data->environment);
+		glow_bloom = environment_get_glow_bloom(p_render_data->environment);
+		glow_hdr_bleed_threshold = environment_get_glow_hdr_bleed_threshold(p_render_data->environment);
+		glow_hdr_bleed_scale = environment_get_glow_hdr_bleed_scale(p_render_data->environment);
+		glow_hdr_luminance_cap = environment_get_glow_hdr_luminance_cap(p_render_data->environment);
+	}
+
+	if (glow_enabled) {
+		rb->check_glow_buffers();
+	}
 
 	if (view_count == 1) {
 		// Resolve if needed.
@@ -2721,23 +2795,41 @@ void RasterizerSceneGLES3::_render_post_processing(const RenderDataGLES3 *p_rend
 			glBlitFramebuffer(0, 0, internal_size.x, internal_size.y, 0, 0, internal_size.x, internal_size.y, GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT, GL_NEAREST);
 		}
 
+		// Rendered to intermediate buffer, must copy to our render target
 		if (fbo_int != 0) {
-			// TODO If we have glow or other post processing, we upscale only depth here, post processing will also do scaling.
+			// Apply glow/bloom if requested? then populate our glow buffers
+			GLuint color = fbo_int != 0 ? rb->get_internal_color() : texture_storage->render_target_get_color(render_target);
+			const GLES3::Glow::GLOWLEVEL *glow_buffers = nullptr;
+			if (glow_enabled) {
+				glow_buffers = rb->get_glow_buffers();
+
+				glow->set_luminance_multiplier(p_render_data->luminance_multiplier);
+
+				glow->set_intensity(glow_intensity);
+				glow->set_glow_bloom(glow_bloom);
+				glow->set_glow_hdr_bleed_threshold(glow_hdr_bleed_threshold);
+				glow->set_glow_hdr_bleed_scale(glow_hdr_bleed_scale);
+				glow->set_glow_hdr_luminance_cap(glow_hdr_luminance_cap);
+
+				glow->process_glow(color, internal_size, glow_buffers);
+			}
+
+			// Copy color buffer
+			post_effects->post_copy(fbo_rt, target_size, color, internal_size, p_render_data->luminance_multiplier, glow_buffers, glow_intensity);
+
+			// Copy depth buffer
 			glBindFramebuffer(GL_READ_FRAMEBUFFER, fbo_int);
 			glBindFramebuffer(GL_DRAW_FRAMEBUFFER, fbo_rt);
-			glBlitFramebuffer(0, 0, internal_size.x, internal_size.y, 0, 0, target_size.x, target_size.y, GL_COLOR_BUFFER_BIT, GL_LINEAR);
 			glBlitFramebuffer(0, 0, internal_size.x, internal_size.y, 0, 0, target_size.x, target_size.y, GL_DEPTH_BUFFER_BIT, GL_NEAREST);
 		}
 
 		glBindFramebuffer(GL_FRAMEBUFFER, fbo_rt);
 	} else if ((fbo_msaa_3d != 0 && msaa3d_needs_resolve) || (fbo_int != 0)) {
 		// TODO investigate if it's smarter to cache these FBOs
-		GLuint fbos[2]; // read and write
-		glGenFramebuffers(2, fbos);
+		GLuint fbos[3]; // read, write and post
+		glGenFramebuffers(3, fbos);
 
-		glBindFramebuffer(GL_READ_FRAMEBUFFER, fbos[0]);
-		glBindFramebuffer(GL_DRAW_FRAMEBUFFER, fbos[1]);
-
+		// Resolve if needed.
 		if (fbo_msaa_3d != 0 && msaa3d_needs_resolve) {
 			GLuint read_color = rb->get_msaa3d_color();
 			GLuint read_depth = rb->get_msaa3d_depth();
@@ -2752,6 +2844,9 @@ void RasterizerSceneGLES3::_render_post_processing(const RenderDataGLES3 *p_rend
 				write_depth = texture_storage->render_target_get_depth(render_target);
 			}
 
+			glBindFramebuffer(GL_READ_FRAMEBUFFER, fbos[0]);
+			glBindFramebuffer(GL_DRAW_FRAMEBUFFER, fbos[1]);
+
 			for (uint32_t v = 0; v < view_count; v++) {
 				glFramebufferTextureLayer(GL_READ_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, read_color, 0, v);
 				glFramebufferTextureLayer(GL_READ_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, read_depth, 0, v);
@@ -2761,25 +2856,53 @@ void RasterizerSceneGLES3::_render_post_processing(const RenderDataGLES3 *p_rend
 			}
 		}
 
+		// Rendered to intermediate buffer, must copy to our render target
 		if (fbo_int != 0) {
-			GLuint read_color = rb->get_internal_color();
-			GLuint read_depth = rb->get_internal_depth();
+			// Apply glow/bloom if requested? then populate our glow buffers
+			const GLES3::Glow::GLOWLEVEL *glow_buffers = nullptr;
+			GLuint source_color = fbo_int != 0 ? rb->get_internal_color() : texture_storage->render_target_get_color(render_target);
+
+			if (glow_enabled) {
+				glow_buffers = rb->get_glow_buffers();
+
+				glow->set_luminance_multiplier(p_render_data->luminance_multiplier);
+
+				glow->set_intensity(glow_intensity);
+				glow->set_glow_bloom(glow_bloom);
+				glow->set_glow_hdr_bleed_threshold(glow_hdr_bleed_threshold);
+				glow->set_glow_hdr_bleed_scale(glow_hdr_bleed_scale);
+				glow->set_glow_hdr_luminance_cap(glow_hdr_luminance_cap);
+			}
+
 			GLuint write_color = texture_storage->render_target_get_color(render_target);
-			GLuint write_depth = texture_storage->render_target_get_depth(render_target);
 
 			for (uint32_t v = 0; v < view_count; v++) {
-				glFramebufferTextureLayer(GL_READ_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, read_color, 0, v);
+				if (glow_enabled) {
+					glow->process_glow(source_color, internal_size, glow_buffers, v, true);
+				}
+
+				glBindFramebuffer(GL_FRAMEBUFFER, fbos[2]);
+				glFramebufferTextureLayer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, write_color, 0, v);
+				post_effects->post_copy(fbos[2], target_size, source_color, internal_size, p_render_data->luminance_multiplier, glow_buffers, glow_intensity, v, true);
+			}
+
+			// Copy depth
+			GLuint read_depth = rb->get_internal_depth();
+			GLuint write_depth = texture_storage->render_target_get_depth(render_target);
+
+			glBindFramebuffer(GL_READ_FRAMEBUFFER, fbos[0]);
+			glBindFramebuffer(GL_DRAW_FRAMEBUFFER, fbos[1]);
+
+			for (uint32_t v = 0; v < view_count; v++) {
 				glFramebufferTextureLayer(GL_READ_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, read_depth, 0, v);
-				glFramebufferTextureLayer(GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, write_color, 0, v);
 				glFramebufferTextureLayer(GL_DRAW_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, write_depth, 0, v);
 
-				glBlitFramebuffer(0, 0, internal_size.x, internal_size.y, 0, 0, target_size.x, target_size.y, GL_COLOR_BUFFER_BIT, GL_LINEAR);
 				glBlitFramebuffer(0, 0, internal_size.x, internal_size.y, 0, 0, target_size.x, target_size.y, GL_DEPTH_BUFFER_BIT, GL_NEAREST);
 			}
 		}
 
 		glBindFramebuffer(GL_FRAMEBUFFER, fbo_rt);
-		glDeleteFramebuffers(2, fbos);
+		glDeleteFramebuffers(3, fbos);
 	}
 }
 
