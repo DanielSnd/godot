@@ -1875,6 +1875,9 @@ void CodeTextEditor::set_error_count(int p_error_count) {
 	error_button->set_visible(p_error_count > 0);
 	if (!p_error_count) {
 		_set_show_errors_panel(false);
+		idle->set_wait_time(EDITOR_GET("text_editor/completion/idle_parse_delay"));
+	} else {
+		idle->set_wait_time(EDITOR_GET("text_editor/completion/idle_parse_delay_if_errors"));
 	}
 }
 
