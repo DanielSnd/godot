@@ -1695,6 +1695,14 @@ void fragment_shader(in SceneData scene_data) {
 
 	{ // Directional light.
 
+
+		// add same boolean variables as before
+		#ifdef LIGHT_SOURCE_INFO
+		// let's set a boolean variable using the way we previously discussed
+		bool _light_has_direction = true;
+		bool _light_has_range = false;
+		#endif
+
 		// Do shadow and lighting in two passes to reduce register pressure.
 #ifndef SHADOWS_DISABLED
 		uint shadow0 = 0;
@@ -2028,6 +2036,13 @@ void fragment_shader(in SceneData scene_data) {
 					binormal,
 					tangent, anisotropy,
 #endif
+
+			#ifdef LIGHT_SOURCE_INFO
+			_light_has_direction, _light_has_range,
+			#endif
+			#ifdef LIGHT_INDEX_USED
+			i,
+			#endif
 					diffuse_light,
 					specular_light);
 		}
