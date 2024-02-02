@@ -1287,6 +1287,13 @@ void main() {
 		uint shadow0 = 0;
 		uint shadow1 = 0;
 
+		// add same boolean variables as before
+		#ifdef LIGHT_SOURCE_INFO
+		// let's set a boolean variable using the way we previously discussed
+		bool _light_has_direction = true;
+		bool _light_has_range = false;
+		#endif
+
 		for (uint i = 0; i < 8; i++) {
 			if (i >= scene_data.directional_light_count) {
 				break;
@@ -1624,9 +1631,16 @@ void main() {
 #ifdef LIGHT_ANISOTROPY_USED
 					binormal, tangent, anisotropy,
 #endif
+
 #ifdef USE_SOFT_SHADOW
 					directional_lights.data[i].size,
 #endif
+			#ifdef LIGHT_SOURCE_INFO
+			_light_has_direction, _light_has_range,
+			#endif
+			#ifdef LIGHT_INDEX_USED
+			i,
+			#endif
 					diffuse_light,
 					specular_light);
 		}
