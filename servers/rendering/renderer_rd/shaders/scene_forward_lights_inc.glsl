@@ -427,6 +427,7 @@ float sample_all_directional_shadows(vec3 vertex) {
 
 // GREVOUT
 
+
 float get_omni_attenuation(float distance, float inv_range, float decay) {
 	float nd = distance * inv_range;
 	nd *= nd;
@@ -572,6 +573,14 @@ float light_process_omni_shadow(uint idx, vec3 vertex, vec3 normal) {
 
 // GREVIN
 #define sample_omni_shadow light_process_omni_shadow
+//position
+vec3 get_omni_light_pos(uint idx) {
+	return omni_lights.data[idx].position;
+}
+
+vec3 get_omni_light_data(uint idx) {
+	return vec3(omni_lights.data[idx].mask, omni_lights.data[idx].inv_radius, omni_lights.data[idx].attenuation);
+}
 
 float measure_omni_attenuation(uint idx, vec3 vertex) {
 	vec3 light_rel_vec = omni_lights.data[idx].position - vertex;

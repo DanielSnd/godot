@@ -3066,9 +3066,11 @@ const ShaderLanguage::BuiltinFuncDef ShaderLanguage::builtin_func_defs[] = {
 	{ "sample_directional_shadow", TYPE_FLOAT, { TYPE_UINT, TYPE_VEC3, TYPE_VOID }, { "light_idx", "vertex" }, TAG_GLOBAL, true },
 	{ "measure_spot_attenuation", TYPE_FLOAT, { TYPE_UINT, TYPE_VEC3, TYPE_VOID }, { "light_idx", "vertex" }, TAG_GLOBAL, true },
 	{ "measure_omni_attenuation", TYPE_FLOAT, { TYPE_UINT, TYPE_VEC3, TYPE_VOID }, { "light_idx", "vertex" }, TAG_GLOBAL, true },
-      { "light_process_omni_shadow" , TYPE_FLOAT, { TYPE_UINT, TYPE_VEC3,TYPE_VEC3, TYPE_VOID }, { "light_idx", "vertex","normal" }, TAG_GLOBAL, true },
+     { "light_process_omni_shadow" , TYPE_FLOAT, { TYPE_UINT, TYPE_VEC3,TYPE_VEC3, TYPE_VOID }, { "light_idx", "vertex","normal" }, TAG_GLOBAL, true },
 	{ "sample_all_directional_shadows", TYPE_FLOAT, { TYPE_VEC3, TYPE_VOID }, { "vertex" }, TAG_GLOBAL, true },
-	//{ "get_light_count", TYPE_UINT, { TYPE_VOID }, { "compare" }, TAG_GLOBAL, false },
+    { "measure_omni_attenuation", TYPE_FLOAT, { TYPE_UINT, TYPE_VEC3, TYPE_VOID }, { "light_idx","vertex" }, TAG_GLOBAL, true },
+	  { "get_omni_light_data", TYPE_VEC3, { TYPE_UINT, TYPE_VOID }, { "light_idx" }, TAG_GLOBAL, true },
+      { "get_omni_light_pos", TYPE_VEC3, { TYPE_UINT, TYPE_VOID }, { "light_idx" }, TAG_GLOBAL, true },
 
 	{ nullptr, TYPE_VOID, { TYPE_VOID }, { "" }, TAG_GLOBAL, false }
 };
