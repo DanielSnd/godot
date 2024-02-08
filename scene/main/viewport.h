@@ -276,7 +276,6 @@ private:
 	Ref<World2D> world_2d;
 
 	StringName input_group;
-	StringName gui_input_group;
 	StringName shortcut_input_group;
 	StringName unhandled_input_group;
 	StringName unhandled_key_input_group;
@@ -610,6 +609,7 @@ public:
 
 	void gui_release_focus();
 	Control *gui_get_focus_owner() const;
+	Control *gui_get_hovered_control() const;
 
 	PackedStringArray get_configuration_warnings() const override;
 

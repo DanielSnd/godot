@@ -372,7 +372,7 @@ bool ShaderMaterial::_property_can_revert(const StringName &p_name) const {
 bool ShaderMaterial::_property_get_revert(const StringName &p_name, Variant &r_property) const {
 	if (shader.is_valid()) {
 		const StringName *pr = remap_cache.getptr(p_name);
-		if (*pr) {
+		if (pr) {
 			r_property = RenderingServer::get_singleton()->shader_get_parameter_default(shader->get_rid(), *pr);
 			return true;
 		}
@@ -1947,7 +1947,7 @@ Ref<Texture2D> BaseMaterial3D::get_texture(TextureParam p_param) const {
 	return textures[p_param];
 }
 
-Ref<Texture2D> BaseMaterial3D::get_texture_by_name(StringName p_name) const {
+Ref<Texture2D> BaseMaterial3D::get_texture_by_name(const StringName &p_name) const {
 	for (int i = 0; i < (int)BaseMaterial3D::TEXTURE_MAX; i++) {
 		TextureParam param = TextureParam(i);
 		if (p_name == shader_names->texture_names[param]) {

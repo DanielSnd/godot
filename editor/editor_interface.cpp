@@ -35,13 +35,13 @@
 #include "editor/editor_node.h"
 #include "editor/editor_paths.h"
 #include "editor/editor_resource_preview.h"
-#include "editor/editor_scale.h"
 #include "editor/editor_settings.h"
 #include "editor/editor_undo_redo_manager.h"
 #include "editor/filesystem_dock.h"
 #include "editor/gui/editor_run_bar.h"
 #include "editor/inspector_dock.h"
 #include "editor/plugins/node_3d_editor_plugin.h"
+#include "editor/themes/editor_scale.h"
 #include "main/main.h"
 #include "scene/gui/box_container.h"
 #include "scene/gui/control.h"
@@ -127,7 +127,7 @@ Vector<Ref<Texture2D>> EditorInterface::make_mesh_previews(const Vector<Ref<Mesh
 	Vector<Ref<Texture2D>> textures;
 
 	for (int i = 0; i < p_meshes.size(); i++) {
-		Ref<Mesh> mesh = p_meshes[i];
+		const Ref<Mesh> &mesh = p_meshes[i];
 		if (!mesh.is_valid()) {
 			textures.push_back(Ref<Texture2D>());
 			continue;
@@ -233,6 +233,10 @@ void EditorInterface::set_distraction_free_mode(bool p_enter) {
 
 bool EditorInterface::is_distraction_free_mode_enabled() const {
 	return EditorNode::get_singleton()->is_distraction_free_mode_enabled();
+}
+
+bool EditorInterface::is_multi_window_enabled() const {
+	return EditorNode::get_singleton()->is_multi_window_enabled();
 }
 
 float EditorInterface::get_editor_scale() const {
@@ -400,6 +404,21 @@ bool EditorInterface::is_movie_maker_enabled() const {
 }
 
 // Base.
+void EditorInterface::get_argument_options(const StringName &p_function, int p_idx, List<String> *r_options) const {
+	String pf = p_function;
+	if (p_idx == 0) {
+		if (pf == "set_main_screen_editor") {
+			for (String E : { "\"2D\"", "\"3D\"", "\"Script\"", "\"AssetLib\"" }) {
+				r_options->push_back(E);
+			}
+		} else if (pf == "get_editor_viewport_3d") {
+			for (uint32_t i = 0; i < Node3DEditor::VIEWPORTS_COUNT; i++) {
+				r_options->push_back(String::num_int64(i));
+			}
+		}
+	}
+	Object::get_argument_options(p_function, p_idx, r_options);
+}
 
 void EditorInterface::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("restart_editor", "save"), &EditorInterface::restart_editor, DEFVAL(true));
@@ -430,6 +449,7 @@ void EditorInterface::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_main_screen_editor", "name"), &EditorInterface::set_main_screen_editor);
 	ClassDB::bind_method(D_METHOD("set_distraction_free_mode", "enter"), &EditorInterface::set_distraction_free_mode);
 	ClassDB::bind_method(D_METHOD("is_distraction_free_mode_enabled"), &EditorInterface::is_distraction_free_mode_enabled);
+	ClassDB::bind_method(D_METHOD("is_multi_window_enabled"), &EditorInterface::is_multi_window_enabled);
 
 	ClassDB::bind_method(D_METHOD("get_editor_scale"), &EditorInterface::get_editor_scale);
 

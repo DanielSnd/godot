@@ -101,9 +101,9 @@ void AnimationNode::blend_animation(const StringName &p_animation, AnimationMixe
 	process_state->tree->make_animation_instance(p_animation, p_playback_info);
 }
 
-double AnimationNode::_pre_process(ProcessState *p_process_state, AnimationMixer::PlaybackInfo p_playback_info) {
+double AnimationNode::_pre_process(ProcessState *p_process_state, AnimationMixer::PlaybackInfo p_playback_info, bool p_test_only) {
 	process_state = p_process_state;
-	double t = process(p_playback_info);
+	double t = process(p_playback_info, p_test_only);
 	process_state = nullptr;
 	return t;
 }
@@ -153,7 +153,7 @@ double AnimationNode::blend_input(int p_input, AnimationMixer::PlaybackInfo p_pl
 }
 
 double AnimationNode::blend_node(Ref<AnimationNode> p_node, const StringName &p_subpath, AnimationMixer::PlaybackInfo p_playback_info, FilterAction p_filter, bool p_sync, bool p_test_only) {
-	node_state.connections.clear();
+	p_node->node_state.connections.clear();
 	return _blend_node(p_node, p_subpath, this, p_playback_info, p_filter, p_sync, p_test_only, nullptr);
 }
 
@@ -270,9 +270,9 @@ double AnimationNode::_blend_node(Ref<AnimationNode> p_node, const StringName &p
 	p_node->node_state.parent = new_parent;
 	if (!p_playback_info.seeked && !p_sync && !any_valid) {
 		p_playback_info.time = 0.0;
-		return p_node->_pre_process(process_state, p_playback_info);
+		return p_node->_pre_process(process_state, p_playback_info, p_test_only);
 	}
-	return p_node->_pre_process(process_state, p_playback_info);
+	return p_node->_pre_process(process_state, p_playback_info, p_test_only);
 }
 
 String AnimationNode::get_caption() const {
@@ -566,12 +566,12 @@ bool AnimationTree::_blend_pre_process(double p_delta, int p_track_count, const 
 		if (started) {
 			// If started, seek.
 			pi.seeked = true;
-			root_animation_node->_pre_process(&process_state, pi);
+			root_animation_node->_pre_process(&process_state, pi, false);
 			started = false;
-		} else {
-			pi.time = p_delta;
-			root_animation_node->_pre_process(&process_state, pi);
 		}
+		pi.seeked = false;
+		pi.time = p_delta;
+		root_animation_node->_pre_process(&process_state, pi, false);
 	}
 
 	if (!process_state.valid) {
@@ -619,7 +619,7 @@ void AnimationTree::_tree_changed() {
 		return;
 	}
 
-	call_deferred(SNAME("_update_properties"));
+	callable_mp(this, &AnimationTree::_update_properties).call_deferred();
 	properties_dirty = true;
 }
 
@@ -885,8 +885,6 @@ void AnimationTree::_bind_methods() {
 
 	ClassDB::bind_method(D_METHOD("set_animation_player", "path"), &AnimationTree::set_animation_player);
 	ClassDB::bind_method(D_METHOD("get_animation_player"), &AnimationTree::get_animation_player);
-
-	ClassDB::bind_method(D_METHOD("_update_properties"), &AnimationTree::_update_properties);
 
 	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "tree_root", PROPERTY_HINT_RESOURCE_TYPE, "AnimationRootNode"), "set_tree_root", "get_tree_root");
 	ADD_PROPERTY(PropertyInfo(Variant::NODE_PATH, "advance_expression_base_node", PROPERTY_HINT_NODE_PATH_VALID_TYPES, "Node"), "set_advance_expression_base_node", "get_advance_expression_base_node");

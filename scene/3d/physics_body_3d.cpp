@@ -182,6 +182,7 @@ bool PhysicsBody3D::test_move(const Transform3D &p_from, const Vector3 &p_motion
 
 	PhysicsServer3D::MotionParameters parameters(p_from, p_motion, p_margin);
 	parameters.recovery_as_collision = p_recovery_as_collision;
+	parameters.max_collisions = p_max_collisions;
 
 	return PhysicsServer3D::get_singleton()->body_test_motion(get_rid(), parameters, r);
 }
@@ -2239,11 +2240,14 @@ void PhysicalBone3D::reset_physics_simulation_state() {
 
 void PhysicalBone3D::reset_to_rest_position() {
 	if (parent_skeleton) {
-		if (-1 == bone_id) {
-			set_global_transform(parent_skeleton->get_global_transform() * body_offset);
+		Transform3D new_transform = parent_skeleton->get_global_transform();
+		if (bone_id == -1) {
+			new_transform *= body_offset;
 		} else {
-			set_global_transform(parent_skeleton->get_global_transform() * parent_skeleton->get_bone_global_pose(bone_id) * body_offset);
+			new_transform *= parent_skeleton->get_bone_global_pose(bone_id) * body_offset;
 		}
+		new_transform.orthonormalize();
+		set_global_transform(new_transform);
 	}
 }
 

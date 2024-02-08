@@ -153,7 +153,9 @@ int OS_Unix::unix_initialize_audio(int p_audio_driver) {
 }
 
 void OS_Unix::initialize_core() {
+#ifdef THREADS_ENABLED
 	init_thread_posix();
+#endif
 
 	FileAccess::make_default<FileAccessUnix>(FileAccess::ACCESS_RESOURCES);
 	FileAccess::make_default<FileAccessUnix>(FileAccess::ACCESS_USERDATA);
@@ -655,6 +657,8 @@ Error OS_Unix::open_dynamic_library(const String p_path, void *&p_library_handle
 		// This code exists so GDExtension can load .so files from a standard unix location.
 		path = get_executable_path().get_base_dir().path_join("../lib").path_join(p_path.get_file());
 	}
+
+	ERR_FAIL_COND_V(!FileAccess::exists(path), ERR_FILE_NOT_FOUND);
 
 	p_library_handle = dlopen(path.utf8().get_data(), GODOT_DLOPEN_MODE);
 	ERR_FAIL_NULL_V_MSG(p_library_handle, ERR_CANT_OPEN, vformat("Can't open dynamic library: %s. Error: %s.", p_path, dlerror()));

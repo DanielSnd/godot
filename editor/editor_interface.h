@@ -99,6 +99,7 @@ public:
 	void set_main_screen_editor(const String &p_name);
 	void set_distraction_free_mode(bool p_enter);
 	bool is_distraction_free_mode_enabled() const;
+	bool is_multi_window_enabled() const;
 
 	float get_editor_scale() const;
 
@@ -151,6 +152,8 @@ public:
 	bool is_movie_maker_enabled() const;
 
 	// Base.
+
+	virtual void get_argument_options(const StringName &p_function, int p_idx, List<String> *r_options) const override;
 
 	static void create();
 	static void free();

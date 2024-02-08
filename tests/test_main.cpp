@@ -30,6 +30,8 @@
 
 #include "test_main.h"
 
+#include "editor/editor_paths.h"
+#include "editor/editor_settings.h"
 #include "tests/core/config/test_project_settings.h"
 #include "tests/core/input/test_input_event.h"
 #include "tests/core/input/test_input_event_key.h"
@@ -121,6 +123,7 @@
 #include "tests/test_validate_testing.h"
 
 #ifndef _3D_DISABLED
+#include "tests/scene/test_camera_3d.h"
 #include "tests/scene/test_navigation_agent_3d.h"
 #include "tests/scene/test_navigation_obstacle_3d.h"
 #include "tests/scene/test_navigation_region_3d.h"
@@ -223,7 +226,7 @@ struct GodotTestCaseListener : public doctest::IReporter {
 		String name = String(p_in.m_name);
 		String suite_name = String(p_in.m_test_suite);
 
-		if (name.find("[SceneTree]") != -1) {
+		if (name.find("[SceneTree]") != -1 || name.find("[Editor]") != -1) {
 			memnew(MessageQueue);
 
 			memnew(Input);
@@ -266,6 +269,13 @@ struct GodotTestCaseListener : public doctest::IReporter {
 			if (!DisplayServer::get_singleton()->has_feature(DisplayServer::Feature::FEATURE_SUBWINDOWS)) {
 				SceneTree::get_singleton()->get_root()->set_embedding_subwindows(true);
 			}
+
+			if (name.find("[Editor]") != -1) {
+				Engine::get_singleton()->set_editor_hint(true);
+				EditorPaths::create();
+				EditorSettings::create();
+			}
+
 			return;
 		}
 
@@ -288,6 +298,12 @@ struct GodotTestCaseListener : public doctest::IReporter {
 	}
 
 	void test_case_end(const doctest::CurrentTestCaseStats &) override {
+		if (EditorSettings::get_singleton()) {
+			EditorSettings::destroy();
+		}
+
+		Engine::get_singleton()->set_editor_hint(false);
+
 		if (SceneTree::get_singleton()) {
 			SceneTree::get_singleton()->finalize();
 		}

@@ -36,10 +36,10 @@
 
 #include "editor/editor_interface.h"
 #include "editor/editor_node.h"
-#include "editor/editor_scale.h"
 #include "editor/editor_settings.h"
 #include "editor/editor_string_names.h"
 #include "editor/plugins/canvas_item_editor_plugin.h"
+#include "editor/themes/editor_scale.h"
 
 #include "scene/2d/tile_map.h"
 #include "scene/gui/box_container.h"
@@ -128,7 +128,9 @@ void TilesEditorUtils::_thread() {
 				tile_map->set_position(-(scale * encompassing_rect.get_center()) + thumbnail_size2 / 2);
 
 				// Add the viewport at the last moment to avoid rendering too early.
-				EditorNode::get_singleton()->call_deferred("add_child", viewport);
+				callable_mp((Node *)EditorNode::get_singleton(), &Node::add_child).call_deferred(viewport, false, Node::INTERNAL_MODE_DISABLED);
+
+				MessageQueue::get_singleton()->flush();
 
 				MessageQueue::get_singleton()->flush();
 
