@@ -325,6 +325,7 @@ ShaderTypes::ShaderTypes() {
 		shader_modes[RS::SHADER_CANVAS_ITEM].modes.push_back({ PNAME("unshaded") });
 		shader_modes[RS::SHADER_CANVAS_ITEM].modes.push_back({ PNAME("light_only") });
 		shader_modes[RS::SHADER_CANVAS_ITEM].modes.push_back({ PNAME("world_vertex_coords") });
+		shader_modes[RS::SHADER_CANVAS_ITEM].modes.push_back({ PNAME("take_all_shadows") });
 	}
 
 	/************ PARTICLES **************************/
