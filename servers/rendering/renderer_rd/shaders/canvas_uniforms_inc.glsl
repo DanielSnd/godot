@@ -52,6 +52,7 @@ struct InstanceData {
 #endif
 	vec2 color_texture_pixel_size;
 	uint lights[4];
+	int z_index;
 };
 
 layout(set = 4, binding = 0, std430) restrict readonly buffer DrawData {
