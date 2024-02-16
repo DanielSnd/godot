@@ -469,15 +469,8 @@ void EditorResourcePreview::start() {
 	if (DisplayServer::get_singleton()->get_name() == "headless") {
 		return;
 	}
-
-	if (RSG::texture_storage->can_create_resources_async()) {
-		ERR_FAIL_COND_MSG(thread.is_started(), "Thread already started.");
-		thread.start(_thread_func, this);
-	} else {
-		SceneTree *st = Object::cast_to<SceneTree>(OS::get_singleton()->get_main_loop());
-		ERR_FAIL_NULL_MSG(st, "Editor's MainLoop is not a SceneTree. This is a bug.");
-		st->add_idle_callback(&_idle_callback);
-	}
+	ERR_FAIL_COND_MSG(thread.is_started(), "Thread already started.");
+	thread.start(_thread_func, this);
 }
 
 void EditorResourcePreview::stop() {
