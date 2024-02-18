@@ -456,9 +456,6 @@ void PopupMenu::_input_from_window(const Ref<InputEvent> &p_event) {
 }
 
 void PopupMenu::_input_from_window_internal(const Ref<InputEvent> &p_event) {
-	Ref<InputEventMouseButton> b = p_event;
-	Ref<InputEventMouseMotion> m = p_event;
-
 	if (!items.is_empty()) {
 		Input *input = Input::get_singleton();
 		Ref<InputEventJoypadMotion> joypadmotion_event = p_event;
@@ -587,41 +584,16 @@ void PopupMenu::_input_from_window_internal(const Ref<InputEvent> &p_event) {
 		}
 	}
 
-	if (m.is_valid() && drag_to_press) {
-		BitField<MouseButtonMask> initial_button_mask = m->get_button_mask();
-		if (!initial_button_mask.has_flag(mouse_button_to_mask(MouseButton::LEFT)) && !initial_button_mask.has_flag(mouse_button_to_mask(MouseButton::RIGHT))) {
-			mouse_is_pressed = false;
+	Ref<InputEventScreenTouch> st = p_event;
+
+	if (st.is_valid()) {
+		uint64_t now = OS::get_singleton()->get_ticks_msec();
+		uint64_t diff = now - popup_time_msec;
+		if (diff < 250) {
+			return;
 		}
 
-		if (!item_clickable_area.has_point(m->get_position()) && !mouse_is_pressed) {
-			drag_to_press = false;
-		}
-	}
-
-	if ((b.is_valid() && b->is_pressed()) || (!mouse_is_pressed && drag_to_press)) {
-		if (b.is_valid()) {
-			MouseButton button_idx = b->get_button_index();
-			if (button_idx != MouseButton::LEFT && button_idx != MouseButton::RIGHT) {
-				return;
-			}
-		} else {
-			uint64_t now = OS::get_singleton()->get_ticks_msec();
-			uint64_t diff = now - popup_time_msec;
-			if (diff < 250) {
-				drag_to_press = false;
-				return;
-			}
-		}
-
-		drag_to_press = false;
-
-		int over = -1;
-
-		if (m.is_valid()) {
-			over = _get_mouse_over(m->get_position());
-		} else if (b.is_valid()) {
-			over = _get_mouse_over(b->get_position());
-		}
+		int over = _get_mouse_over(st->get_position());
 
 		if (over < 0) {
 			hide();
@@ -638,6 +610,40 @@ void PopupMenu::_input_from_window_internal(const Ref<InputEvent> &p_event) {
 		}
 		activate_item(over);
 	}
+
+	Ref<InputEventMouseButton> b = p_event;
+
+	if (b.is_valid() && !b->is_pressed()) {
+		MouseButton button_idx = b->get_button_index();
+		if (button_idx != MouseButton::LEFT && button_idx != MouseButton::RIGHT) {
+			return;
+		}
+
+		uint64_t now = OS::get_singleton()->get_ticks_msec();
+		uint64_t diff = now - popup_time_msec;
+		if (diff < 250) {
+			return;
+		}
+
+		int over = _get_mouse_over(b->get_position());
+
+		if (over < 0) {
+			hide();
+			return;
+		}
+
+		if (items[over].separator || items[over].disabled) {
+			return;
+		}
+
+		if (!items[over].submenu.is_empty()) {
+			_activate_submenu(over);
+			return;
+		}
+		activate_item(over);
+	}
+
+	Ref<InputEventMouseMotion> m = p_event;
 
 	if (m.is_valid()) {
 		if (m->get_velocity().is_zero_approx()) {
@@ -2805,8 +2811,6 @@ void PopupMenu::popup(const Rect2i &p_bounds) {
 	moved = Vector2();
 	popup_time_msec = OS::get_singleton()->get_ticks_msec();
 	Popup::popup(p_bounds);
-	drag_to_press = true;
-	mouse_is_pressed = true;
 }
 
 PopupMenu::PopupMenu() {
