@@ -360,6 +360,172 @@ void SpriteFramesEditor::_sheet_clear_all_frames() {
 	split_sheet_preview->queue_redraw();
 }
 
+void SpriteFramesEditor::_sheet_calculation_flood_fill(Vector2i pos, int label, Vector<int>& grid, int width, int height) {
+	if (pos.x < 0 || pos.x >= width || pos.y < 0 || pos.y >= height || grid[int(pos.y * width + pos.x)] != 1) {
+		return;
+	}
+
+	grid.set(pos.y * width + pos.x, label);
+
+	const Vector2 dirs[4] = {
+		Vector2(-1, 0),
+		Vector2(0, -1),
+		Vector2(1, 0),
+		Vector2(0, 1)
+	};
+
+	for (int i = 0; i < 4; ++i) {
+		_sheet_calculation_flood_fill(pos + dirs[i], label, grid, width, height);
+	}
+}
+
+void SpriteFramesEditor::_sheet_calculate_frames() {
+	Ref<Texture2D> spritesheet_texture = split_sheet_preview->get_texture();
+	if (spritesheet_texture.is_null()) {
+		EditorNode::get_singleton()->show_warning(TTR("Unable to read spritesheet"));
+		ERR_FAIL_COND(spritesheet_texture.is_null());
+	}
+
+	int width = spritesheet_texture->get_width();
+	int height = spritesheet_texture->get_height();
+
+	// Create a grid to identify the individual sprites with flood fill and AABB checks.
+	Vector<int> grid;
+	grid.resize(width * height);
+
+	// Fill the grid with initial values of 1 for opaque and 0 for transparent pixels.
+	for (int y = 0; y < height; ++y) {
+		for (int x = 0; x < width; ++x) {
+			grid.set(y * width + x, spritesheet_texture->is_pixel_opaque(x, y) ? 1 : 0);
+		}
+	}
+
+	// Go over the grid identifying each sprite by flood filling it with a different integer label value.
+	int spriteLabel = 2; // Labels start from 2 because 0 and 1 are reserved for transparency
+	for (int y = 0; y < height; ++y) {
+		for (int x = 0; x < width; ++x) {
+			if (grid[int(y * width + x)] == 1) {
+				_sheet_calculation_flood_fill(Vector2(x, y), spriteLabel++, grid, width, height);
+			}
+		}
+	}
+
+	const float individual_sprites_found = spriteLabel - 2;
+
+	print_line("Individual sprites found with flood fill",individual_sprites_found);
+
+	// Create bounding boxes to find the average sprite size.
+	HashMap<int,AABB> boxes_dictionary;
+	for (int y = 0; y < height; ++y) {
+		for (int x = 0; x < width; ++x) {
+			const int label_for_spot = grid[int(y * width + x)];
+			// If the label found at this position is less than 2 it's not an identified sprite so continue.
+			if (label_for_spot < 2) {
+				continue;
+			}
+
+			Vector3 pos(x, y, 0);
+			// If there is an AABB created already for this spot, expand to the new found position,
+			// otherwise create one at this position.
+			if (!boxes_dictionary.has(label_for_spot)) {
+				boxes_dictionary[label_for_spot] = AABB(pos,Vector3(1.0,1.0,1.0));
+			}
+			else {
+				boxes_dictionary[label_for_spot].expand_to(pos);
+			}
+		}
+	}
+
+	Vector<AABB> all_aabbs;
+	for (const KeyValue<int, AABB> &E : boxes_dictionary) {
+		// Only consider AABBs bigger than 1
+		if (E.value.size.x * E.value.size.y > 1.01) {
+			all_aabbs.append(E.value);
+		}
+	}
+
+	// Now we're going to go over all of the AABBs we created and see if any of them are
+	// interesecting with another, this can happen if there's smaller pieces within the sprite.
+	// If we find intersecting AABBs we combine them into a bigger one.
+	int aabb_iterator = 0;
+	while (aabb_iterator < all_aabbs.size()) {
+		bool merged = false;
+
+		for (int j = aabb_iterator + 1; j < all_aabbs.size(); ++j) {
+			if (all_aabbs[aabb_iterator].intersects(all_aabbs[j])) {
+				all_aabbs.set(aabb_iterator, all_aabbs[aabb_iterator].merge(all_aabbs[j]));
+				all_aabbs.remove_at(j);
+				merged = true;
+				break;  // Need to break out because the iterator has changed.
+			}
+		}
+
+		if (!merged) {
+			++aabb_iterator;
+		}
+	}
+
+	print_line("AABBs found after merging ",all_aabbs.size());
+
+	// Now we calculate the area of each box and find an average area value.
+	float average_area = 0;
+	for (const AABB &aabb : all_aabbs) {
+		Vector3 box_size = aabb.get_size();
+		average_area += (box_size.x + 1) * (box_size.y + 1);
+	}
+	average_area /= individual_sprites_found;
+
+	print_line("Average area found ",average_area);
+	Vector<AABB> valid_boxes;
+
+	// Here we use the average area value to discard any boxes that differ too much from it.
+	// This step should help remove problems from sprites that have a lot of contiguous opaque spaces.
+	for (const AABB &aabb : all_aabbs) {
+		Vector3 box_size = aabb.get_size();
+		print_line("Testing if should discard... area ",(box_size.x * box_size.y)," discard cutoff (area * 0.95) is ",average_area," discard? ",((box_size.x * box_size.y) < average_area));
+		if ((box_size.x * box_size.y) > average_area) {
+			valid_boxes.push_back(aabb);
+		}
+	}
+
+	print_line("AABBs found after filtering by average area ",valid_boxes.size());
+
+	// Now for each of our valid AABBs we're going to create a new AABB using its size but stretching
+	// it using the image size to find the amount of rows and columns for that AABB.
+	int row_amount = 1;
+	int column_amount = 1;
+	for (int i = 0; i < valid_boxes.size(); ++i) {
+		AABB row_test = AABB(valid_boxes[i].position,valid_boxes[i].size * Vector3(width,0.5,1.0));
+		AABB column_test = AABB(valid_boxes[i].position,valid_boxes[i].size * Vector3(0.5,height,1.0));
+		int testing_row_amount = 1;
+		int testing_column_amount = 1;
+		for (int j = 0; j < valid_boxes.size(); ++j) {
+			if(i == j) continue;
+			if (valid_boxes[j].intersects(row_test)) {
+				testing_row_amount++;
+			}
+			if (valid_boxes[j].intersects(column_test)) {
+				testing_column_amount++;
+			}
+		}
+
+		if (testing_row_amount > row_amount) {
+			row_amount = testing_row_amount;
+		}
+		if (testing_column_amount > column_amount) {
+			column_amount = testing_column_amount;
+		}
+	}
+
+	//TODO: REMOVE 1 FROM ALL SIDES OF THE AABB CAUSE IT CAN BE MESSING UP WHEN THERE'S LESS THAN 1 PIXEL TRANSPARENCY BETWEEN THEM.
+	//TODO: Find what the final sprite size would be with this count, create an AABB with a slightly smaller size
+	//placing it where the sprite would be (half size horizontal, half size vertical), then test if this new assumed AABB intersects only one other AABB from
+	//the valid ones. if it intersects more than 1 then add one to the horizontal amount, and run the test again until it only interesects with one AABB, that should be the final number.
+
+	split_sheet_h->set_value(row_amount);
+	split_sheet_v->set_value(column_amount);
+}
+
 void SpriteFramesEditor::_sheet_sort_frames() {
 	if (!frames_need_sort) {
 		return;
@@ -530,8 +696,8 @@ void SpriteFramesEditor::_prepare_sprite_sheet(const String &p_file) {
 			// Different texture, reset to 4x4.
 			dominant_param = PARAM_FRAME_COUNT;
 			updating_split_settings = true;
-			split_sheet_h->set_value(4);
-			split_sheet_v->set_value(4);
+			//split_sheet_h->set_value(4);
+			//split_sheet_v->set_value(4);
 			split_sheet_size_x->set_value(size.x / 4);
 			split_sheet_size_y->set_value(size.y / 4);
 			split_sheet_sep_x->set_value(0);
@@ -2196,6 +2362,15 @@ SpriteFramesEditor::SpriteFramesEditor() {
 	split_sheet_v_hb->add_child(split_sheet_v);
 	split_sheet_v->connect("value_changed", callable_mp(this, &SpriteFramesEditor::_sheet_spin_changed).bind(PARAM_FRAME_COUNT));
 	split_sheet_settings_vb->add_child(split_sheet_v_hb);
+
+	HBoxContainer *split_sheet_calculate_button = memnew(HBoxContainer);
+	split_sheet_calculate_button->set_h_size_flags(SIZE_EXPAND_FILL);
+
+	Button *auto_calculate = memnew(Button);
+	auto_calculate->set_text(TTR("Calculate"));
+	auto_calculate->connect("pressed", callable_mp(this, &SpriteFramesEditor::_sheet_calculate_frames));
+	split_sheet_calculate_button->add_child(auto_calculate);
+	split_sheet_settings_vb->add_child(split_sheet_calculate_button);
 
 	HBoxContainer *split_sheet_size_hb = memnew(HBoxContainer);
 	split_sheet_size_hb->set_h_size_flags(SIZE_EXPAND_FILL);
