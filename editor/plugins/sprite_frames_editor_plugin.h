@@ -241,6 +241,11 @@ class SpriteFramesEditor : public HSplitContainer {
 	void _sheet_order_selected(int p_option);
 	void _sheet_select_all_frames();
 	void _sheet_clear_all_frames();
+
+	void _sheet_calculation_flood_fill(Vector2i pos, int label, Vector<int> &grid, int width, int height);
+
+	void _sheet_calculate_frames();
+
 	void _sheet_sort_frames();
 	void _toggle_show_settings();
 	void _update_show_settings();
