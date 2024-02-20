@@ -707,7 +707,6 @@ void SpriteFramesEditor::_prepare_sprite_sheet(const String &p_file) {
 			updating_split_settings = false;
 		}
 		previous_texture_size = size;
-
 		// Reset zoom.
 		_sheet_zoom_reset();
 	}
