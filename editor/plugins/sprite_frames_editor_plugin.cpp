@@ -693,9 +693,9 @@ void SpriteFramesEditor::_prepare_sprite_sheet(const String &p_file) {
 		// Different texture, calculate horizontal and vertical values.
 		dominant_param = PARAM_FRAME_COUNT;
 		updating_split_settings = true;
-		_sheet_calculate_frames();
-		// split_sheet_h->set_value(4);
-		// split_sheet_v->set_value(4);
+		//_sheet_calculate_frames();
+		split_sheet_h->set_value(4);
+		split_sheet_v->set_value(4);
 		split_sheet_size_x->set_value(size.x / split_sheet_h->get_value());
 		split_sheet_size_y->set_value(size.y / split_sheet_v->get_value());
 		split_sheet_sep_x->set_value(0);
