@@ -85,6 +85,36 @@ void SceneCacheInterface::on_peer_change(int p_id, bool p_connected) {
 	}
 }
 
+void SceneCacheInterface::transfer_peer_id_ownership(int p_from_id, int p_to_id,bool remove_from_peer_afterwards) {
+	PeerInfo *pinfo_from = peers_info.getptr(p_from_id);
+	PeerInfo *pinfo_to = peers_info.getptr(p_to_id);
+
+	// Can't transfer if one of them doesn't exist
+	if (pinfo_from == nullptr || pinfo_to == nullptr)
+		return;
+
+	for (KeyValue<int, ObjectID> E : pinfo_from->recv_nodes) {
+		pinfo_to->recv_nodes[E.key] = E.value;
+	}
+	for (const ObjectID &oid : pinfo_from->sent_nodes) {
+		NodeCache *nc = nodes_cache.getptr(oid);
+		ERR_CONTINUE(!nc);
+		if (nc->recv_ids.has(p_from_id)) {
+			nc->recv_ids[p_to_id] = nc->recv_ids[p_from_id];
+			if(remove_from_peer_afterwards) {
+				nc->recv_ids.erase(p_from_id);
+			}
+		}
+		if(nc->confirmed_peers.has(p_from_id)) {
+			nc->confirmed_peers[p_to_id] = nc->confirmed_peers[p_from_id];
+		}
+		nc->confirmed_peers.erase(p_from_id);
+	}
+	if(remove_from_peer_afterwards) {
+		peers_info.erase(p_from_id);
+	}
+}
+
 void SceneCacheInterface::process_simplify_path(int p_from, const uint8_t *p_packet, int p_packet_len) {
 	ERR_FAIL_COND(!peers_info.has(p_from)); // Bug.
 	ERR_FAIL_COND_MSG(p_packet_len < 38, "Invalid packet received. Size too small.");
@@ -209,6 +239,7 @@ bool SceneCacheInterface::is_cache_confirmed(Node *p_node, int p_peer) {
 	bool *confirmed = cache ? cache->confirmed_peers.getptr(p_peer) : nullptr;
 	return confirmed && *confirmed;
 }
+
 
 int SceneCacheInterface::make_object_cache(Object *p_obj) {
 	Node *node = Object::cast_to<Node>(p_obj);
