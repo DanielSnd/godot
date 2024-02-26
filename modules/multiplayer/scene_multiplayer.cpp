@@ -632,6 +632,19 @@ int SceneMultiplayer::get_max_delta_packet_size() const {
 	return replicator->get_max_delta_packet_size();
 }
 
+HashSet<ObjectID> SceneMultiplayer::get_replicator_object_ids() {
+	return replicator->get_replicator_object_ids();
+}
+
+
+void SceneMultiplayer::transfer_peer_id_ownership(int p_from_id, int p_to_id,bool remove_from_peer_afterwards) {
+	replicator->transfer_peer_id_ownership(p_from_id,p_to_id,remove_from_peer_afterwards);
+	cache->transfer_peer_id_ownership(p_from_id,p_to_id,remove_from_peer_afterwards);
+
+	if(remove_from_peer_afterwards && connected_peers.has(p_from_id))
+		connected_peers.erase(p_from_id);
+}
+
 void SceneMultiplayer::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_root_path", "path"), &SceneMultiplayer::set_root_path);
 	ClassDB::bind_method(D_METHOD("get_root_path"), &SceneMultiplayer::get_root_path);
