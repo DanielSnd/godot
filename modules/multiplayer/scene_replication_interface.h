@@ -146,6 +146,10 @@ public:
 	void set_max_delta_packet_size(int p_size);
 	int get_max_delta_packet_size() const;
 
+	HashSet<ObjectID> get_replicator_object_ids();
+
+	void transfer_peer_id_ownership(int p_from_id, int p_to_id,bool remove_from_peer_afterwards = false);
+
 	SceneReplicationInterface(SceneMultiplayer *p_multiplayer, SceneCacheInterface *p_cache) {
 		multiplayer = p_multiplayer;
 		multiplayer_cache = p_cache;
