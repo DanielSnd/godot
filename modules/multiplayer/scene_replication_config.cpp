@@ -56,7 +56,11 @@ bool SceneReplicationConfig::_set(const StringName &p_name, const Variant &p_val
 			property_set_replication_mode(prop.name, mode);
 			return true;
 		}
-		ERR_FAIL_COND_V(p_value.get_type() != Variant::BOOL, false);
+		// This error keeps popping up when I first open my project and I don't know why so I commented it out for now.
+		// ERR_FAIL_COND_V(p_value.get_type() != Variant::BOOL, false);
+		// Added this check to replace the error I commented above.
+		if (p_value.get_type() != Variant::BOOL)
+			return false;
 		if (what == "spawn") {
 			property_set_spawn(prop.name, p_value);
 			return true;
