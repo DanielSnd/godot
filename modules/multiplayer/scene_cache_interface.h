@@ -76,6 +76,8 @@ public:
 	Object *get_cached_object(int p_from, uint32_t p_cache_id);
 	bool is_cache_confirmed(Node *p_path, int p_peer);
 
+	void transfer_peer_id_ownership(int p_from_id, int p_to_id,bool remove_from_peer_afterwards = false);
+
 	SceneCacheInterface(SceneMultiplayer *p_multiplayer) { multiplayer = p_multiplayer; }
 };
 

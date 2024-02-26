@@ -109,6 +109,65 @@ void SceneReplicationInterface::on_peer_change(int p_id, bool p_connected) {
 	}
 }
 
+void SceneReplicationInterface::transfer_peer_id_ownership(int p_from_id, int p_to_id,bool remove_from_peer_afterwards) {
+	PeerInfo *pinfo_from = peers_info.getptr(p_from_id);
+	PeerInfo *pinfo_to = peers_info.getptr(p_to_id);
+
+	// Can't transfer if one of them doesn't exist
+	if (pinfo_from == nullptr || pinfo_to == nullptr)
+		return;
+
+	for (ObjectID syncnode: pinfo_from->sync_nodes) {
+		pinfo_to->sync_nodes.insert(syncnode);
+	}
+	for (ObjectID syncnode: pinfo_from->spawn_nodes) {
+		pinfo_to->spawn_nodes.insert(syncnode);
+	}
+	for (KeyValue<ObjectID, uint64_t> &E : pinfo_from->last_watch_usecs) {
+		pinfo_to->last_watch_usecs[E.key] = E.value;
+	}
+	for (KeyValue<uint32_t, ObjectID> &E : pinfo_from->recv_sync_ids) {
+		pinfo_to->recv_sync_ids[E.key] = E.value;
+	}
+	for (KeyValue<uint32_t, ObjectID> &E : pinfo_from->recv_nodes) {
+		pinfo_to->recv_nodes[E.key] = E.value;
+	}
+	pinfo_to->last_sent_sync = pinfo_from->last_sent_sync;
+
+	for (KeyValue<ObjectID, TrackedNode> &E : tracked_nodes) {
+		if (E.value.remote_peer == p_from_id) {
+			E.value.remote_peer = p_to_id;
+		}
+		Node* get_node = get_id_as<Node>(E.value.id);
+		// Now I need to check if this node's multiplayer authority is the old one and change it to new one if it is.
+		if (get_node != nullptr && get_node->get_multiplayer_authority() == p_from_id) {
+			// Here I'm not setting it recursively on the root because I could have a synchronizer with different authority as a direct child
+			get_node->set_multiplayer_authority(p_to_id, false);
+			for (int i = 0; i < get_node->get_child_count(); ++i) {
+				Node* child_node = get_node->get_child(i);
+				if (child_node != nullptr && child_node->get_multiplayer_authority() == p_from_id) {
+					// Here I am because I would need to create a new recursive method if I wanted to do this checking further, and at least
+					// on my own use it won't matter this deep into the node path.
+					child_node->set_multiplayer_authority(true);
+				}
+			}
+		}
+		Node* get_spawner = get_id_as<Node>(E.value.spawner);
+		if (get_spawner != nullptr && get_spawner->get_multiplayer_authority() == p_from_id) {
+			get_spawner->set_multiplayer_authority(p_to_id, false);
+		}
+		for (ObjectID synchronizer: E.value.synchronizers) {
+			Node* get_synchronizer = get_id_as<Node>(synchronizer);
+			if (get_synchronizer != nullptr && get_synchronizer->get_multiplayer_authority() == p_from_id) {
+				get_synchronizer->set_multiplayer_authority(p_to_id, false);
+			}
+		}
+	}
+	if(remove_from_peer_afterwards) {
+		peers_info.erase(p_from_id);
+	}
+}
+
 void SceneReplicationInterface::on_reset() {
 	for (const KeyValue<int, PeerInfo> &E : peers_info) {
 		_free_remotes(E.value);
@@ -918,4 +977,8 @@ void SceneReplicationInterface::set_max_delta_packet_size(int p_size) {
 
 int SceneReplicationInterface::get_max_delta_packet_size() const {
 	return delta_mtu;
+}
+
+HashSet<ObjectID> SceneReplicationInterface::get_replicator_object_ids() {
+	return sync_nodes;
 }
