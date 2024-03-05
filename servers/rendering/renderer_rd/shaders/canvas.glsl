@@ -279,6 +279,7 @@ float texture_sdf(vec2 p_sdf) {
 	return d * canvas_data.tex_to_sdf;
 }
 
+
 vec2 texture_sdf_normal(vec2 p_sdf) {
 	vec2 uv = p_sdf * canvas_data.sdf_to_tex.xy + canvas_data.sdf_to_tex.zw;
 
@@ -525,6 +526,35 @@ void light_blend_compute(uint light_base, vec4 light_color, inout vec3 color) {
 
 float msdf_median(float r, float g, float b, float a) {
 	return min(max(min(r, g), min(max(r, g), b)), a);
+}
+
+vec4 texture_sample_shadow(vec2 p_sdf) {
+	uint light_count = (draw_data.flags >> FLAGS_LIGHT_COUNT_SHIFT) & 0xF; //max 16 lights
+	p_sdf = (canvas_data.canvas_transform * vec4(p_sdf, 0.0, 1.0)).xy;
+
+	float return_found_shadow = 0.0;
+	float return_found_shadow_uv_z = 0.0;
+	float lights_sampled = 0.0;
+	for (uint i = 0; i < MAX_LIGHTS_PER_ITEM; i++) {
+		if (i >= light_count) {	break; }
+		uint light_base = draw_data.lights[i >> 2];
+		light_base >>= (i & 3) * 8;
+		light_base &= 0xFF;
+		if (!bool(light_array.data[light_base].flags & LIGHT_FLAGS_HAS_SHADOW))	continue;
+		vec2 shadow_pos = (vec4(p_sdf, 0.0, 1.0) * mat4(light_array.data[light_base].shadow_matrix[0], light_array.data[light_base].shadow_matrix[1], vec4(0.0, 0.0, 1.0, 0.0), vec4(0.0, 0.0, 0.0, 1.0))).xy; //multiply inverse given its transposed. Optimizer removes useless operations.
+		vec2 pos_norm = normalize(shadow_pos);
+		vec2 pos_box = pos_norm / max(abs(pos_norm.x), abs(pos_norm.y));
+		vec2 pos_rot = pos_norm * mat2(vec2(0.7071067811865476, -0.7071067811865476), vec2(0.7071067811865476, 0.7071067811865476)); //is there a faster way to 45 degrees rot?
+		float tex_ofs = pos_rot.y > 0 ? (pos_rot.x > 0 ? pos_box.y * 0.125 + 0.125 : pos_box.x * -0.125 + (0.25 + 0.125)) : (pos_rot.x < 0 ? pos_box.y * -0.125 + (0.5 + 0.125) : pos_box.x * 0.125 + (0.75 + 0.125));
+		float distance = (pos_rot.y > 0 ? (pos_rot.x > 0 ? shadow_pos.x : shadow_pos.y) : (pos_rot.x < 0 ? -shadow_pos.x : -shadow_pos.y)) * light_array.data[light_base].shadow_zfar_inv;
+		vec4 shadow_uv = vec4(tex_ofs, light_array.data[light_base].shadow_y_ofs, distance, 1.0);
+		return_found_shadow_uv_z = shadow_uv.z;
+		return_found_shadow += textureProjLod(sampler2D(shadow_atlas_texture, shadow_sampler), shadow_uv, 0.0).x;
+		lights_sampled += 1.0;
+	}
+
+	float shadow_sample = (return_found_shadow > 0.0 && fract(return_found_shadow) < return_found_shadow_uv_z) ? 0.0 : 1.0;
+	return vec4(shadow_sample,return_found_shadow_uv_z,return_found_shadow,lights_sampled);
 }
 
 void main() {
