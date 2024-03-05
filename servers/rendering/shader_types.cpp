@@ -298,6 +298,12 @@ ShaderTypes::ShaderTypes() {
 		shader_modes[RS::SHADER_CANVAS_ITEM].functions["light"].stage_functions["screen_uv_to_sdf"] = func;
 	}
 
+	{
+		ShaderLanguage::StageFunctionInfo func;
+		func.arguments.push_back(ShaderLanguage::StageFunctionInfo::Argument("pos", ShaderLanguage::TYPE_VEC2));
+		func.return_type = ShaderLanguage::TYPE_VEC4; //whether it could emit
+		shader_modes[RS::SHADER_CANVAS_ITEM].functions["fragment"].stage_functions["texture_sample_shadow"] = func;
+	}
 	shader_modes[RS::SHADER_CANVAS_ITEM].functions["light"].built_ins["FRAGCOORD"] = constt(ShaderLanguage::TYPE_VEC4);
 	shader_modes[RS::SHADER_CANVAS_ITEM].functions["light"].built_ins["NORMAL"] = constt(ShaderLanguage::TYPE_VEC3);
 	shader_modes[RS::SHADER_CANVAS_ITEM].functions["light"].built_ins["COLOR"] = constt(ShaderLanguage::TYPE_VEC4);
