@@ -2610,6 +2610,8 @@ RendererCanvasRenderRD::RendererCanvasRenderRD() {
 		actions.renames["texture_sdf"] = "texture_sdf";
 		actions.renames["texture_sdf_normal"] = "texture_sdf_normal";
 		actions.renames["texture_sample_shadow"] = "texture_sample_shadow";
+		actions.renames["texture_sample_shadow_zindex"] = "texture_sample_shadow_zindex";
+		actions.renames["texture_sample_light"] = "texture_sample_light";
 		actions.renames["sdf_to_screen_uv"] = "sdf_to_screen_uv";
 		actions.renames["screen_uv_to_sdf"] = "screen_uv_to_sdf";
 
@@ -2625,6 +2627,8 @@ RendererCanvasRenderRD::RendererCanvasRenderRD() {
 
 		actions.render_mode_defines["skip_vertex_transform"] = "#define SKIP_TRANSFORM_USED\n";
 		actions.render_mode_defines["take_all_shadows"] = "#define TAKE_ALL_SHADOWS\n";
+		actions.render_mode_defines["prevent_shadows"] = "#define PREVENT_SHADOWS\n";
+		actions.render_mode_defines["prevent_light"] = "#define PREVENT_LIGHT\n";
 		actions.render_mode_defines["unshaded"] = "#define MODE_UNSHADED\n";
 		actions.render_mode_defines["light_only"] = "#define MODE_LIGHT_ONLY\n";
 		actions.render_mode_defines["world_vertex_coords"] = "#define USE_WORLD_VERTEX_COORDS\n";
