@@ -1173,7 +1173,9 @@ MaterialStorage::MaterialStorage() {
 
 		actions.renames["texture_sdf"] = "texture_sdf";
 		actions.renames["texture_sdf_normal"] = "texture_sdf_normal";
+		actions.renames["texture_sample_shadow_zindex"] = "texture_sample_shadow_zindex";
 		actions.renames["texture_sample_shadow"] = "texture_sample_shadow";
+		actions.renames["texture_sample_light"] = "texture_sample_light";
 		actions.renames["sdf_to_screen_uv"] = "sdf_to_screen_uv";
 		actions.renames["screen_uv_to_sdf"] = "screen_uv_to_sdf";
 
