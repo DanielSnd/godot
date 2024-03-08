@@ -531,7 +531,8 @@ float msdf_median(float r, float g, float b, float a) {
 	return min(max(min(r, g), min(max(r, g), b)), a);
 }
 
-vec4 texture_sample_shadow_zindex(vec3 in_pos_z_index) {
+vec4 texture_sample_shadow_zindex(vec4 in_pos_z_index) {
+	float adjust_value = in_pos_z_index.w < 0.0 ? 0.035 : in_pos_z_index.w;
 	uint light_count = (draw_data.flags >> FLAGS_LIGHT_COUNT_SHIFT) & 0xF; //max 16 lights
 	vec2 p_sdf = (canvas_data.canvas_transform * vec4(in_pos_z_index.x,in_pos_z_index.y, 0.0, 1.0)).xy;
 
@@ -554,24 +555,61 @@ vec4 texture_sample_shadow_zindex(vec3 in_pos_z_index) {
 		return_distance = distance;
 		distance *=  light_array.data[light_base].shadow_zfar_inv;
 		vec4 shadow_uv = vec4(tex_ofs, light_array.data[light_base].shadow_y_ofs, distance, 1.0);
+
+		uint shadow_mode = light_array.data[light_base].flags & LIGHT_FLAGS_FILTER_MASK;
+
 		return_found_shadow_uv_z = distance;
-		float shadow_value = textureProjLod(sampler2D(shadow_atlas_texture, shadow_sampler), shadow_uv, 0.0).x;
-		lights_sampled = shadow_value;
+		float shadow_value = 0.0;
 
-		float should_shade_extra_shade = 1.0 - step((distance - shadow_value),0.035);
-		//COLOR.rgb = vec3(step((return_found_shadow_uv_z - lights_sampled) * 10.00,0.42));
+		if (shadow_mode == LIGHT_FLAGS_SHADOW_PCF5) {
+			vec4 shadow_pixel_size = vec4(light_array.data[light_base].shadow_pixel_size, 0.0, 0.0, 0.0);
+			float current_sample = textureProjLod(sampler2D(shadow_atlas_texture, shadow_sampler), (shadow_uv - shadow_pixel_size * 2.0), 0.0).x;
+			float should_shade_extra_shade = 1.0 - step((distance - current_sample),adjust_value);
+			if ((current_sample > (in_pos_z_index.z < -5.0 ? draw_data.z_index : in_pos_z_index.z) && fract(current_sample) < distance) || should_shade_extra_shade > 0.5) {
+				shadow_value += 1.0;
+			}
+			current_sample = textureProjLod(sampler2D(shadow_atlas_texture, shadow_sampler), (shadow_uv - shadow_pixel_size), 0.0).x;
+			should_shade_extra_shade = 1.0 - step((distance - current_sample),0.035);
+			if ((current_sample > (in_pos_z_index.z < -5.0 ? draw_data.z_index : in_pos_z_index.z) && fract(current_sample) < distance) || should_shade_extra_shade > 0.5) {
+				shadow_value += 1.0;
+			}
+			current_sample = textureProjLod(sampler2D(shadow_atlas_texture, shadow_sampler), shadow_uv + shadow_pixel_size, 0.0).x;
+			should_shade_extra_shade = 1.0 - step((distance - current_sample),0.035);
+			if ((current_sample > (in_pos_z_index.z < -5.0 ? draw_data.z_index : in_pos_z_index.z) && fract(current_sample) < distance) || should_shade_extra_shade > 0.5) {
+				shadow_value += 1.0;
+			}
+			current_sample = textureProjLod(sampler2D(shadow_atlas_texture, shadow_sampler), shadow_uv, 0.0).x;
+			should_shade_extra_shade = 1.0 - step((distance - current_sample),0.035);
+			if ((current_sample > (in_pos_z_index.z < -5.0 ? draw_data.z_index : in_pos_z_index.z) && fract(current_sample) < distance) || should_shade_extra_shade > 0.5) {
+				shadow_value += 1.0;
+			}
+			current_sample = textureProjLod(sampler2D(shadow_atlas_texture, shadow_sampler), shadow_uv + shadow_pixel_size * 2.0, 0.0).x;
+			should_shade_extra_shade = 1.0 - step((distance - current_sample),0.035);
+			if ((current_sample > (in_pos_z_index.z < -5.0 ? draw_data.z_index : in_pos_z_index.z) && fract(current_sample) < distance) || should_shade_extra_shade > 0.5) {
+				shadow_value += 1.0;
+			}
+			shadow_value /= 5.0;
 
-		if ((shadow_value > (in_pos_z_index.z < -5.0 ? draw_data.z_index : in_pos_z_index.z) && fract(shadow_value) < distance) || should_shade_extra_shade > 0.5) {
-			return_found_shadow += shadow_value;
+			if (shadow_value > 0.0) {
+				return_found_shadow += shadow_value;
+			}
+		} else {
+			shadow_value = textureProjLod(sampler2D(shadow_atlas_texture, shadow_sampler), shadow_uv, 0.0).x;
+			float should_shade_extra_shade = 1.0 - step((distance - shadow_value),adjust_value);
+			if ((shadow_value > (in_pos_z_index.z < -5.0 ? draw_data.z_index : in_pos_z_index.z) && fract(shadow_value) < distance) || should_shade_extra_shade > 0.5) {
+				return_found_shadow += shadow_value;
+			}
 		}
+
+		lights_sampled = shadow_value;
 	}
 
-	float shadow_sample = (return_found_shadow > 0.0 && fract(return_found_shadow) < return_found_shadow_uv_z) ? 0.0 : 1.0;
+	//float shadow_sample = (return_found_shadow > 0.0 && fract(return_found_shadow) < return_found_shadow_uv_z) ? 0.0 : 1.0;
 	return vec4(return_distance,return_found_shadow_uv_z,return_found_shadow,lights_sampled);
 }
 
 vec4 texture_sample_shadow(vec2 p_sdf) {
-	return texture_sample_shadow_zindex(vec3(p_sdf,-10.0));
+	return texture_sample_shadow_zindex(vec4(p_sdf,-10.0,-1.0));
 }
 
 vec4 texture_sample_light(vec2 p_sdf) {
