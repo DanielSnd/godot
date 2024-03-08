@@ -312,7 +312,7 @@ ShaderTypes::ShaderTypes() {
 	}
 	{
 		ShaderLanguage::StageFunctionInfo func;
-		func.arguments.push_back(ShaderLanguage::StageFunctionInfo::Argument("pos", ShaderLanguage::TYPE_VEC3));
+		func.arguments.push_back(ShaderLanguage::StageFunctionInfo::Argument("pos", ShaderLanguage::TYPE_VEC4));
 		func.return_type = ShaderLanguage::TYPE_VEC4; //whether it could emit
 		shader_modes[RS::SHADER_CANVAS_ITEM].functions["fragment"].stage_functions["texture_sample_shadow_zindex"] = func;
 	}
