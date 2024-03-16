@@ -56,6 +56,7 @@ public:
 	struct Frame {
 		Ref<Texture2D> texture;
 		float duration;
+		int callback;
 	};
 	Vector<Frame> frames;
 };
@@ -116,6 +117,10 @@ class SpriteFramesEditor : public HSplitContainer {
 	Button *zoom_reset = nullptr;
 	Button *zoom_in = nullptr;
 	SpinBox *frame_duration = nullptr;
+	OptionButton *frame_callback = nullptr;
+	OptionButton *auto_transition = nullptr;
+	LineEdit *line_edit_callback = nullptr;
+	Button *edit_callback_button = nullptr;
 	ItemList *frame_list = nullptr;
 	bool loading_scene;
 	Vector<int> selection;
@@ -196,6 +201,11 @@ class SpriteFramesEditor : public HSplitContainer {
 	void _up_pressed();
 	void _down_pressed();
 	void _frame_duration_changed(double p_value);
+
+	void _update_frame_callback_list();
+	void _frame_callback_edit_button_pressed();
+
+	void _frame_callback_changed(int p_value);
 	void _update_library(bool p_skip_selector = false);
 	void _update_library_impl();
 
@@ -214,6 +224,9 @@ class SpriteFramesEditor : public HSplitContainer {
 	void _animation_remove_confirmed();
 	void _animation_search_text_changed(const String &p_text);
 	void _animation_loop_changed();
+
+	void _animation_auto_transition_changed(int p_value);
+
 	void _animation_speed_changed(double p_value);
 
 	void _frame_list_gui_input(const Ref<InputEvent> &p_event);

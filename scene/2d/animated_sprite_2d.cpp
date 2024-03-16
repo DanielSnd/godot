@@ -202,6 +202,12 @@ void AnimatedSprite2D::_notification(int p_what) {
 								frame = last_frame;
 								pause();
 								emit_signal(SceneStringName(animation_finished));
+								int auto_transition = (frames->get_animation_auto_transition(animation));
+								if (auto_transition > 0) {
+									auto animation_names = frames->get_animation_names();
+									if (auto_transition-1 < animation_names.size())
+										play(animation_names[auto_transition-1]);
+								}
 								return;
 							}
 						} else {
@@ -210,6 +216,10 @@ void AnimatedSprite2D::_notification(int p_what) {
 						_calc_frame_speed_scale();
 						frame_progress = 0.0;
 						queue_redraw();
+						frame_callback = _get_frame_callback();
+						if (frame_callback != 0) {
+							emit_signal(SceneStringNames::get_singleton()->frame_callback,frame_callback);
+						}
 						emit_signal(SceneStringName(frame_changed));
 					}
 					double to_process = MIN((1.0 - frame_progress) / abs_speed, remaining);
@@ -525,6 +535,13 @@ double AnimatedSprite2D::_get_frame_duration() {
 	return 1.0;
 }
 
+int AnimatedSprite2D::_get_frame_callback() {
+	if (frames.is_valid() && frames->has_animation(animation)) {
+		return frames->get_frame_callback(animation, frame);
+	}
+	return 0;
+}
+
 void AnimatedSprite2D::_calc_frame_speed_scale() {
 	frame_speed_scale = 1.0 / _get_frame_duration();
 }
@@ -645,6 +662,7 @@ void AnimatedSprite2D::_bind_methods() {
 	ADD_SIGNAL(MethodInfo("sprite_frames_changed"));
 	ADD_SIGNAL(MethodInfo("animation_changed"));
 	ADD_SIGNAL(MethodInfo("frame_changed"));
+	ADD_SIGNAL(MethodInfo("frame_callback", PropertyInfo(Variant::INT, "callback_value")));
 	ADD_SIGNAL(MethodInfo("animation_looped"));
 	ADD_SIGNAL(MethodInfo("animation_finished"));
 
