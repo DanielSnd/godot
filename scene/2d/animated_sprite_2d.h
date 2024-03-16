@@ -43,6 +43,7 @@ class AnimatedSprite2D : public Node2D {
 	bool playing = false;
 	StringName animation = "default";
 	int frame = 0;
+	int frame_callback = 0;
 	float speed_scale = 1.0;
 	float custom_speed_scale = 1.0;
 
@@ -58,6 +59,9 @@ class AnimatedSprite2D : public Node2D {
 	void _res_changed();
 
 	double _get_frame_duration();
+
+	int _get_frame_callback();
+
 	void _calc_frame_speed_scale();
 	void _stop_internal(bool p_reset);
 
