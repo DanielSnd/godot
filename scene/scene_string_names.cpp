@@ -106,6 +106,7 @@ SceneStringNames::SceneStringNames() {
 	font_color = StaticCString::create("font_color");
 
 	frame_changed = StaticCString::create("frame_changed");
+	frame_callback = StaticCString::create("frame_callback");
 	texture_changed = StaticCString::create("texture_changed");
 
 	autoplay = StaticCString::create("autoplay");
