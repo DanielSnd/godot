@@ -121,6 +121,7 @@ public:
 	StringName area_exited;
 
 	StringName frame_changed;
+	StringName frame_callback;
 	StringName texture_changed;
 
 	StringName autoplay;
