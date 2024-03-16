@@ -103,6 +103,7 @@ SceneStringNames::SceneStringNames() {
 	line_separation = StaticCString::create("line_separation");
 
 	frame_changed = StaticCString::create("frame_changed");
+	frame_callback = StaticCString::create("frame_callback");
 	texture_changed = StaticCString::create("texture_changed");
 
 	autoplay = StaticCString::create("autoplay");

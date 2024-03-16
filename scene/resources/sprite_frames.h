@@ -41,18 +41,25 @@ class SpriteFrames : public Resource {
 	struct Frame {
 		Ref<Texture2D> texture;
 		float duration = 1.0;
+		int callback = 0;
 	};
 
 	struct Anim {
 		double speed = 5.0;
 		bool loop = true;
+		int auto_transition = 0;
 		Vector<Frame> frames;
 	};
 
 	HashMap<StringName, Anim> animations;
+	Vector<StringName> callbacks;
 
 	Array _get_animations() const;
 	void _set_animations(const Array &p_animations);
+
+	Array _get_callbacks() const;
+
+	void _set_callbacks(const Array &p_animations);
 
 protected:
 	static void _bind_methods();
@@ -66,14 +73,29 @@ public:
 	void get_animation_list(List<StringName> *r_animations) const;
 	Vector<String> get_animation_names() const;
 
+	void add_callback(const StringName &p_anim);
+	bool has_callback(const StringName &p_anim) const;
+	void remove_callback(const StringName &p_anim);
+
+	void rename_callback_index(int p_prev, const StringName &p_next);
+
+	void rename_callback(const StringName &p_prev, const StringName &p_next);
+
+	int get_callback_count() const;
+	void get_callback_list(List<StringName> *r_animations) const;
+	Vector<String> get_callback_names() const;
+
 	void set_animation_speed(const StringName &p_anim, double p_fps);
 	double get_animation_speed(const StringName &p_anim) const;
 
 	void set_animation_loop(const StringName &p_anim, bool p_loop);
 	bool get_animation_loop(const StringName &p_anim) const;
 
-	void add_frame(const StringName &p_anim, const Ref<Texture2D> &p_texture, float p_duration = 1.0, int p_at_pos = -1);
-	void set_frame(const StringName &p_anim, int p_idx, const Ref<Texture2D> &p_texture, float p_duration = 1.0);
+	void set_animation_auto_transition(const StringName &p_anim, int p_auto_transition);
+	int get_animation_auto_transition(const StringName &p_anim) const;
+
+	void add_frame(const StringName &p_anim, const Ref<Texture2D> &p_texture, float p_duration = 1.0,int p_callback = 0, int p_at_pos = -1);
+	void set_frame(const StringName &p_anim, int p_idx, const Ref<Texture2D> &p_texture, float p_duration = 1.0, int p_callback = 0);
 	void remove_frame(const StringName &p_anim, int p_idx);
 
 	int get_frame_count(const StringName &p_anim) const;
@@ -98,6 +120,17 @@ public:
 		}
 
 		return E->value.frames[p_idx].duration;
+	}
+
+	_FORCE_INLINE_ int get_frame_callback(const StringName &p_anim, int p_idx) const {
+		HashMap<StringName, Anim>::ConstIterator E = animations.find(p_anim);
+		ERR_FAIL_COND_V_MSG(!E, 1.0, "Animation '" + String(p_anim) + "' doesn't exist.");
+		ERR_FAIL_COND_V(p_idx < 0, 1.0);
+		if (p_idx >= E->value.frames.size()) {
+			return 0;
+		}
+
+		return E->value.frames[p_idx].callback;
 	}
 
 	void clear(const StringName &p_anim);
