@@ -173,7 +173,8 @@ void Resource::connect_changed(const Callable &p_callable, uint32_t p_flags) {
 		return;
 	}
 	if (!is_connected(CoreStringNames::get_singleton()->changed, p_callable) || p_flags & CONNECT_REFERENCE_COUNTED) {
-		connect(CoreStringNames::get_singleton()->changed, p_callable, p_flags);
+		if (p_callable.is_valid())
+			connect(CoreStringNames::get_singleton()->changed, p_callable, p_flags);
 	}
 }
 
