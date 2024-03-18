@@ -299,7 +299,7 @@ void SpriteFramesEditor::_sheet_add_frames() {
 		at->set_atlas(split_sheet_preview->get_texture());
 		at->set_region(Rect2(offset + frame_coords * (frame_size + separation), frame_size));
 
-		undo_redo->add_do_method(frames.ptr(), "add_frame", edited_anim, at, 1.0, -1);
+		undo_redo->add_do_method(frames.ptr(), "add_frame", edited_anim, at, 1.0, 0, -1);
 		undo_redo->add_undo_method(frames.ptr(), "remove_frame", edited_anim, fc);
 	}
 
@@ -799,7 +799,7 @@ void SpriteFramesEditor::_file_load_request(const Vector<String> &p_path, int p_
 	int count = 0;
 
 	for (const Ref<Texture2D> &E : resources) {
-		undo_redo->add_do_method(frames.ptr(), "add_frame", edited_anim, E, 1.0, p_at_pos == -1 ? -1 : p_at_pos + count);
+		undo_redo->add_do_method(frames.ptr(), "add_frame", edited_anim, E, 1.0, 0, p_at_pos == -1 ? -1 : p_at_pos + count);
 		undo_redo->add_undo_method(frames.ptr(), "remove_frame", edited_anim, p_at_pos == -1 ? fc : p_at_pos);
 		count++;
 	}
@@ -972,7 +972,7 @@ void SpriteFramesEditor::_empty2_pressed() {
 
 	EditorUndoRedoManager *undo_redo = EditorUndoRedoManager::get_singleton();
 	undo_redo->create_action(TTR("Add Empty"), UndoRedo::MERGE_DISABLE, frames.ptr());
-	undo_redo->add_do_method(frames.ptr(), "add_frame", edited_anim, texture, 1.0, from + 1);
+	undo_redo->add_do_method(frames.ptr(), "add_frame", edited_anim, texture, 1.0, 0, from + 1);
 	undo_redo->add_undo_method(frames.ptr(), "remove_frame", edited_anim, from + 1);
 	undo_redo->add_do_method(this, "_update_library");
 	undo_redo->add_undo_method(this, "_update_library");
@@ -1674,7 +1674,7 @@ void SpriteFramesEditor::_update_library_impl() {
 
 		if (callback != 0) {
 			auto callback_names = frames->get_callback_names();
-			if (callback_names.size() > callback-1) {
+			if (callback_names.size() > callback-1 && callback_names.size() > 0 && callback-1 >= 0) {
 				name += vformat(" [%s]", (callback_names[callback-1]));
 			} else {
 				name += vformat(" [Callback %d]", (callback));
