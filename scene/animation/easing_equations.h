@@ -56,44 +56,46 @@
  * SOFTWARE.
  */
 
+#define EASING_FUNC(m_type) static real_t m_type(real_t t, real_t b, real_t c, real_t d, real_t p1, real_t p2)
+
 namespace Linear {
-static real_t in(real_t t, real_t b, real_t c, real_t d) {
+EASING_FUNC(in) {
 	return c * t / d + b;
 }
 }; // namespace Linear
 
 namespace Sine {
-static real_t in(real_t t, real_t b, real_t c, real_t d) {
+EASING_FUNC(in) {
 	return -c * std::cos(t / d * (Math::PI / 2)) + c + b;
 }
 
-static real_t out(real_t t, real_t b, real_t c, real_t d) {
+EASING_FUNC(out) {
 	return c * std::sin(t / d * (Math::PI / 2)) + b;
 }
 
-static real_t in_out(real_t t, real_t b, real_t c, real_t d) {
+EASING_FUNC(in_out) {
 	return -c / 2 * (std::cos(Math::PI * t / d) - 1) + b;
 }
 
-static real_t out_in(real_t t, real_t b, real_t c, real_t d) {
+EASING_FUNC(out_in) {
 	if (t < d / 2) {
-		return out(t * 2, b, c / 2, d);
+		return out(t * 2, b, c / 2, d, p1, p2);
 	}
 	real_t h = c / 2;
-	return in(t * 2 - d, b + h, h, d);
+	return in(t * 2 - d, b + h, h, d, p1, p2);
 }
 }; // namespace Sine
 
 namespace Quint {
-static real_t in(real_t t, real_t b, real_t c, real_t d) {
+EASING_FUNC(in) {
 	return c * std::pow(t / d, 5) + b;
 }
 
-static real_t out(real_t t, real_t b, real_t c, real_t d) {
+EASING_FUNC(out) {
 	return c * (std::pow(t / d - 1, 5) + 1) + b;
 }
 
-static real_t in_out(real_t t, real_t b, real_t c, real_t d) {
+EASING_FUNC(in_out) {
 	t = t / d * 2;
 
 	if (t < 1) {
@@ -102,25 +104,25 @@ static real_t in_out(real_t t, real_t b, real_t c, real_t d) {
 	return c / 2 * (std::pow(t - 2, 5) + 2) + b;
 }
 
-static real_t out_in(real_t t, real_t b, real_t c, real_t d) {
+EASING_FUNC(out_in) {
 	if (t < d / 2) {
-		return out(t * 2, b, c / 2, d);
+		return out(t * 2, b, c / 2, d, p1, p2);
 	}
 	real_t h = c / 2;
-	return in(t * 2 - d, b + h, h, d);
+	return in(t * 2 - d, b + h, h, d, p1, p2);
 }
 }; // namespace Quint
 
 namespace Quart {
-static real_t in(real_t t, real_t b, real_t c, real_t d) {
+EASING_FUNC(in) {
 	return c * std::pow(t / d, 4) + b;
 }
 
-static real_t out(real_t t, real_t b, real_t c, real_t d) {
+EASING_FUNC(out) {
 	return -c * (std::pow(t / d - 1, 4) - 1) + b;
 }
 
-static real_t in_out(real_t t, real_t b, real_t c, real_t d) {
+EASING_FUNC(in_out) {
 	t = t / d * 2;
 
 	if (t < 1) {
@@ -129,26 +131,26 @@ static real_t in_out(real_t t, real_t b, real_t c, real_t d) {
 	return -c / 2 * (std::pow(t - 2, 4) - 2) + b;
 }
 
-static real_t out_in(real_t t, real_t b, real_t c, real_t d) {
+EASING_FUNC(out_in) {
 	if (t < d / 2) {
-		return out(t * 2, b, c / 2, d);
+		return out(t * 2, b, c / 2, d, p1, p2);
 	}
 	real_t h = c / 2;
-	return in(t * 2 - d, b + h, h, d);
+	return in(t * 2 - d, b + h, h, d, p1, p2);
 }
 }; // namespace Quart
 
 namespace Quad {
-static real_t in(real_t t, real_t b, real_t c, real_t d) {
+EASING_FUNC(in) {
 	return c * std::pow(t / d, 2) + b;
 }
 
-static real_t out(real_t t, real_t b, real_t c, real_t d) {
+EASING_FUNC(out) {
 	t /= d;
 	return -c * t * (t - 2) + b;
 }
 
-static real_t in_out(real_t t, real_t b, real_t c, real_t d) {
+EASING_FUNC(in_out) {
 	t = t / d * 2;
 
 	if (t < 1) {
@@ -157,31 +159,31 @@ static real_t in_out(real_t t, real_t b, real_t c, real_t d) {
 	return -c / 2 * ((t - 1) * (t - 3) - 1) + b;
 }
 
-static real_t out_in(real_t t, real_t b, real_t c, real_t d) {
+EASING_FUNC(out_in) {
 	if (t < d / 2) {
-		return out(t * 2, b, c / 2, d);
+		return out(t * 2, b, c / 2, d, p1, p2);
 	}
 	real_t h = c / 2;
-	return in(t * 2 - d, b + h, h, d);
+	return in(t * 2 - d, b + h, h, d, p1, p2);
 }
 }; // namespace Quad
 
 namespace Expo {
-static real_t in(real_t t, real_t b, real_t c, real_t d) {
+EASING_FUNC(in) {
 	if (t == 0) {
 		return b;
 	}
 	return c * std::pow(2, 10 * (t / d - 1)) + b - c * 0.001;
 }
 
-static real_t out(real_t t, real_t b, real_t c, real_t d) {
+EASING_FUNC(out) {
 	if (t == d) {
 		return b + c;
 	}
 	return c * 1.001 * (-std::pow(2, -10 * t / d) + 1) + b;
 }
 
-static real_t in_out(real_t t, real_t b, real_t c, real_t d) {
+EASING_FUNC(in_out) {
 	if (t == 0) {
 		return b;
 	}
@@ -198,95 +200,92 @@ static real_t in_out(real_t t, real_t b, real_t c, real_t d) {
 	return c / 2 * 1.0005 * (-std::pow(2, -10 * (t - 1)) + 2) + b;
 }
 
-static real_t out_in(real_t t, real_t b, real_t c, real_t d) {
+EASING_FUNC(out_in) {
 	if (t < d / 2) {
-		return out(t * 2, b, c / 2, d);
+		return out(t * 2, b, c / 2, d, p1, p2);
 	}
 	real_t h = c / 2;
-	return in(t * 2 - d, b + h, h, d);
+	return in(t * 2 - d, b + h, h, d, p1, p2);
 }
 }; // namespace Expo
 
 namespace Elastic {
-static real_t in(real_t t, real_t b, real_t c, real_t d) {
+EASING_FUNC(in) {
 	if (t == 0) {
 		return b;
 	}
-
 	t /= d;
 	if (t == 1) {
 		return b + c;
 	}
 
 	t -= 1;
-	float p = d * 0.3f;
-	float a = c * std::pow(2, 10 * t);
+	float p = d * p1;
+	float a = c * std::pow(2, p2 * t);
 	float s = p / 4;
 
 	return -(a * std::sin((t * d - s) * (2 * Math::PI) / p)) + b;
 }
 
-static real_t out(real_t t, real_t b, real_t c, real_t d) {
+EASING_FUNC(out) {
 	if (t == 0) {
 		return b;
 	}
-
 	t /= d;
 	if (t == 1) {
 		return b + c;
 	}
 
-	float p = d * 0.3f;
+	float p = d * p1;
 	float s = p / 4;
 
 	return (c * std::pow(2, -10 * t) * std::sin((t * d - s) * (2 * Math::PI) / p) + c + b);
 }
 
-static real_t in_out(real_t t, real_t b, real_t c, real_t d) {
+EASING_FUNC(in_out) {
 	if (t == 0) {
 		return b;
 	}
-
 	if ((t /= d / 2) == 2) {
 		return b + c;
 	}
 
-	float p = d * (0.3f * 1.5f);
+	float p = d * (p1 * 1.5f);
 	float a = c;
 	float s = p / 4;
 
 	if (t < 1) {
 		t -= 1;
-		a *= std::pow(2, 10 * t);
+		a *= std::pow(2, p2 * t);
 		return -0.5f * (a * std::sin((t * d - s) * (2 * Math::PI) / p)) + b;
 	}
 
 	t -= 1;
-	a *= std::pow(2, -10 * t);
+	a *= std::pow(2, -p2 * t);
 	return a * std::sin((t * d - s) * (2 * Math::PI) / p) * 0.5f + c + b;
 }
 
-static real_t out_in(real_t t, real_t b, real_t c, real_t d) {
+EASING_FUNC(out_in) {
 	if (t < d / 2) {
-		return out(t * 2, b, c / 2, d);
+		return out(t * 2, b, c / 2, d, p1, p2);
 	}
 	real_t h = c / 2;
-	return in(t * 2 - d, b + h, h, d);
+	return in(t * 2 - d, b + h, h, d, p1, p2);
 }
 }; // namespace Elastic
 
 namespace Cubic {
-static real_t in(real_t t, real_t b, real_t c, real_t d) {
+EASING_FUNC(in) {
 	t /= d;
 	return c * t * t * t + b;
 }
 
-static real_t out(real_t t, real_t b, real_t c, real_t d) {
+EASING_FUNC(out) {
 	t = t / d - 1;
 	return c * (t * t * t + 1) + b;
 }
 
-static real_t in_out(real_t t, real_t b, real_t c, real_t d) {
+EASING_FUNC(in_out) {
 	t /= d / 2;
 	if (t < 1) {
 		return c / 2 * t * t * t + b;
@@ -295,28 +294,28 @@ static real_t in_out(real_t t, real_t b, real_t c, real_t d) {
 	t -= 2;
 	return c / 2 * (t * t * t + 2) + b;
 }
-
-static real_t out_in(real_t t, real_t b, real_t c, real_t d) {
+	
+EASING_FUNC(out_in) {
 	if (t < d / 2) {
-		return out(t * 2, b, c / 2, d);
+		return out(t * 2, b, c / 2, d, p1, p2);
 	}
 	real_t h = c / 2;
-	return in(t * 2 - d, b + h, h, d);
+	return in(t * 2 - d, b + h, h, d, p1, p2);
 }
 }; // namespace Cubic
 
 namespace Circ {
-static real_t in(real_t t, real_t b, real_t c, real_t d) {
+EASING_FUNC(in) {
 	t /= d;
 	return -c * (std::sqrt(1 - t * t) - 1) + b;
 }
 
-static real_t out(real_t t, real_t b, real_t c, real_t d) {
+EASING_FUNC(out) {
 	t = t / d - 1;
 	return c * std::sqrt(1 - t * t) + b;
 }
 
-static real_t in_out(real_t t, real_t b, real_t c, real_t d) {
+EASING_FUNC(in_out) {
 	t /= d / 2;
 	if (t < 1) {
 		return -c / 2 * (std::sqrt(1 - t * t) - 1) + b;
@@ -326,75 +325,75 @@ static real_t in_out(real_t t, real_t b, real_t c, real_t d) {
 	return c / 2 * (std::sqrt(1 - t * t) + 1) + b;
 }
 
-static real_t out_in(real_t t, real_t b, real_t c, real_t d) {
+EASING_FUNC(out_in) {
 	if (t < d / 2) {
-		return out(t * 2, b, c / 2, d);
+		return out(t * 2, b, c / 2, d, p1, p2);
 	}
 	real_t h = c / 2;
-	return in(t * 2 - d, b + h, h, d);
+	return in(t * 2 - d, b + h, h, d, p1, p2);
 }
 }; // namespace Circ
 
 namespace Bounce {
-static real_t out(real_t t, real_t b, real_t c, real_t d) {
+EASING_FUNC(out) {
 	t /= d;
 
-	if (t < (1 / 2.75f)) {
-		return c * (7.5625f * t * t) + b;
+	if (t < (1 / p1)) {
+		return c * (p2 * t * t) + b;
 	}
 
-	if (t < (2 / 2.75f)) {
-		t -= 1.5f / 2.75f;
-		return c * (7.5625f * t * t + 0.75f) + b;
+	if (t < (2 / p1)) {
+		t -= 1.5f / p1;
+		return c * (p2 * t * t + 0.75f) + b;
 	}
 
-	if (t < (2.5 / 2.75)) {
-		t -= 2.25f / 2.75f;
-		return c * (7.5625f * t * t + 0.9375f) + b;
+	if (t < (2.5 / p1)) {
+		t -= 2.25f / p1;
+		return c * (p2 * t * t + 0.9375f) + b;
 	}
 
-	t -= 2.625f / 2.75f;
-	return c * (7.5625f * t * t + 0.984375f) + b;
+	t -= 2.625f / p1;
+	return c * (p2 * t * t + 0.984375f) + b;
 }
 
-static real_t in(real_t t, real_t b, real_t c, real_t d) {
-	return c - out(d - t, 0, c, d) + b;
+EASING_FUNC(in) {
+	return c - out(d - t, 0, c, d, p1, p2) + b;
 }
 
-static real_t in_out(real_t t, real_t b, real_t c, real_t d) {
+EASING_FUNC(in_out) {
 	if (t < d / 2) {
-		return in(t * 2, b, c / 2, d);
+		return in(t * 2, b, c / 2, d, p1, p2);
 	}
 	real_t h = c / 2;
-	return out(t * 2 - d, b + h, h, d);
+	return out(t * 2 - d, b + h, h, d, p1, p2);
 }
 
-static real_t out_in(real_t t, real_t b, real_t c, real_t d) {
+EASING_FUNC(out_in) {
 	if (t < d / 2) {
-		return out(t * 2, b, c / 2, d);
+		return out(t * 2, b, c / 2, d, p1, p2);
 	}
 	real_t h = c / 2;
-	return in(t * 2 - d, b + h, h, d);
+	return in(t * 2 - d, b + h, h, d, p1, p2);
 }
 }; // namespace Bounce
 
 namespace Back {
-static real_t in(real_t t, real_t b, real_t c, real_t d) {
-	float s = 1.70158f;
+EASING_FUNC(in) {
+	const real_t s = p1;
 	t /= d;
 
 	return c * t * t * ((s + 1) * t - s) + b;
 }
 
-static real_t out(real_t t, real_t b, real_t c, real_t d) {
-	float s = 1.70158f;
+EASING_FUNC(out) {
+	const real_t s = p1;
 	t = t / d - 1;
 
 	return c * (t * t * ((s + 1) * t + s) + 1) + b;
 }
 
-static real_t in_out(real_t t, real_t b, real_t c, real_t d) {
-	float s = 1.70158f * 1.525f;
+EASING_FUNC(in_out) {
+	const real_t s = p1 * p2;
 	t /= d / 2;
 
 	if (t < 1) {
@@ -405,40 +404,42 @@ static real_t in_out(real_t t, real_t b, real_t c, real_t d) {
 	return c / 2 * (t * t * ((s + 1) * t + s) + 2) + b;
 }
 
-static real_t out_in(real_t t, real_t b, real_t c, real_t d) {
+EASING_FUNC(out_in) {
 	if (t < d / 2) {
-		return out(t * 2, b, c / 2, d);
+		return out(t * 2, b, c / 2, d, p1, p2);
 	}
 	real_t h = c / 2;
-	return in(t * 2 - d, b + h, h, d);
+	return in(t * 2 - d, b + h, h, d, p1, p2);
 }
 }; // namespace Back
 
 namespace Spring {
-static real_t out(real_t t, real_t b, real_t c, real_t d) {
+EASING_FUNC(out) {
 	t /= d;
 	real_t s = 1.0 - t;
 	t = (std::sin(t * Math::PI * (0.2 + 2.5 * t * t * t)) * std::pow(s, 2.2) + t) * (1.0 + (1.2 * s));
 	return c * t + b;
 }
 
-static real_t in(real_t t, real_t b, real_t c, real_t d) {
-	return c - out(d - t, 0, c, d) + b;
+EASING_FUNC(in) {
+	return c - out(d - t, 0, c, d, p1, p2) + b;
 }
 
-static real_t in_out(real_t t, real_t b, real_t c, real_t d) {
+EASING_FUNC(in_out) {
 	if (t < d / 2) {
-		return in(t * 2, b, c / 2, d);
+		return in(t * 2, b, c / 2, d, p1, p2);
 	}
 	real_t h = c / 2;
-	return out(t * 2 - d, b + h, h, d);
+	return out(t * 2 - d, b + h, h, d, p1, p2);
 }
 
-static real_t out_in(real_t t, real_t b, real_t c, real_t d) {
+EASING_FUNC(out_in) {
 	if (t < d / 2) {
-		return out(t * 2, b, c / 2, d);
+		return out(t * 2, b, c / 2, d, p1, p2);
 	}
 	real_t h = c / 2;
-	return in(t * 2 - d, b + h, h, d);
+	return in(t * 2 - d, b + h, h, d, p1, p2);
 }
-}; // namespace Spring
+}; // namespace spring
+
+#undef EASING_FUNC
