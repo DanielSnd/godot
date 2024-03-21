@@ -66,6 +66,8 @@ class Tween : public RefCounted {
 	friend class PropertyTweener;
 
 public:
+	static inline constexpr int PARAM_COUNT = 2;
+
 	enum TweenProcessMode {
 		TWEEN_PROCESS_PHYSICS,
 		TWEEN_PROCESS_IDLE,
@@ -105,6 +107,7 @@ private:
 	TweenProcessMode process_mode = TweenProcessMode::TWEEN_PROCESS_IDLE;
 	TweenPauseMode pause_mode = TweenPauseMode::TWEEN_PAUSE_BOUND;
 	TransitionType default_transition = TransitionType::TRANS_LINEAR;
+	real_t default_trans_params[PARAM_COUNT] = { INFINITY, INFINITY };
 	EaseType default_ease = EaseType::EASE_IN_OUT;
 	ObjectID bound_node;
 
@@ -119,14 +122,13 @@ private:
 	bool started = false;
 	bool running = true;
 	bool dead = false;
-	bool valid = false;
 	bool default_parallel = false;
 	bool parallel_enabled = false;
 #ifdef DEBUG_ENABLED
 	bool is_infinite = false;
 #endif
 
-	typedef real_t (*interpolater)(real_t t, real_t b, real_t c, real_t d);
+	typedef real_t (*interpolater)(real_t t, real_t b, real_t c, real_t d, real_t p1, real_t p2);
 	static interpolater interpolaters[TRANS_MAX][EASE_MAX];
 
 	void _start_tweeners();
@@ -134,8 +136,14 @@ private:
 	bool _validate_type_match(const Variant &p_from, Variant &r_to);
 
 protected:
+	bool valid = false;
 	static void _bind_methods();
+#ifndef DISABLE_DEPRECATED
+	Ref<Tween> _set_trans_bind_compat_82155(Tween::TransitionType p_trans);
+	static Variant _interpolate_variant_bind_compat_82155(const Variant &p_initial_val, const Variant &p_delta_val, double p_time, double p_duration, TransitionType p_trans, EaseType p_ease);
 
+	static void _bind_compatibility_methods();
+#endif
 public:
 	virtual String to_string() override;
 
@@ -165,16 +173,17 @@ public:
 	Ref<Tween> set_loops(int p_loops);
 	int get_loops_left() const;
 	Ref<Tween> set_speed_scale(float p_speed);
-	Ref<Tween> set_trans(TransitionType p_trans);
+	Ref<Tween> set_trans(TransitionType p_trans, real_t p_param1 = INFINITY, real_t p_param2 = INFINITY);
 	TransitionType get_trans();
 	Ref<Tween> set_ease(EaseType p_ease);
 	EaseType get_ease();
+	void get_transition_parameters(TransitionType p_trans, real_t *r_params) const;
 
 	Ref<Tween> parallel();
 	Ref<Tween> chain();
 
-	static real_t run_equation(TransitionType p_trans_type, EaseType p_ease_type, real_t t, real_t b, real_t c, real_t d);
-	static Variant interpolate_variant(const Variant &p_initial_val, const Variant &p_delta_val, double p_time, double p_duration, Tween::TransitionType p_trans, Tween::EaseType p_ease);
+	static real_t run_equation(TransitionType p_trans_type, EaseType p_ease_type, real_t t, real_t b, real_t c, real_t d, real_t p_param1 = INFINITY, real_t p_param2 = INFINITY);
+	static Variant interpolate_variant(const Variant &p_initial_val, const Variant &p_delta_val, double p_time, double p_duration, Tween::TransitionType p_trans, Tween::EaseType p_ease, real_t p_param1 = INFINITY, real_t p_param2 = INFINITY);
 
 	bool step(double p_delta);
 	bool can_process(bool p_tree_paused) const;
@@ -197,7 +206,7 @@ public:
 	Ref<PropertyTweener> from(const Variant &p_value);
 	Ref<PropertyTweener> from_current();
 	Ref<PropertyTweener> as_relative();
-	Ref<PropertyTweener> set_trans(Tween::TransitionType p_trans);
+	Ref<PropertyTweener> set_trans(Tween::TransitionType p_trans, real_t p_param1 = INFINITY, real_t p_param2 = INFINITY);
 	Ref<PropertyTweener> set_ease(Tween::EaseType p_ease);
 	Ref<PropertyTweener> set_custom_interpolator(const Callable &p_method);
 	Ref<PropertyTweener> set_delay(double p_delay);
@@ -212,6 +221,12 @@ public:
 protected:
 	static void _bind_methods();
 
+#ifndef DISABLE_DEPRECATED
+	Ref<PropertyTweener> _set_trans_bind_compat_82155(Tween::TransitionType p_trans);
+
+	static void _bind_compatibility_methods();
+#endif
+
 private:
 	ObjectID target;
 	Vector<StringName> property;
@@ -225,6 +240,7 @@ private:
 	double duration = 0;
 	Tween::TransitionType trans_type = Tween::TRANS_MAX; // This is set inside set_tween();
 	Tween::EaseType ease_type = Tween::EASE_MAX;
+	real_t trans_params[Tween::PARAM_COUNT] = { INFINITY, INFINITY };
 	Callable custom_method;
 
 	double delay = 0;
@@ -273,7 +289,7 @@ class MethodTweener : public Tweener {
 	GDCLASS(MethodTweener, Tweener);
 
 public:
-	Ref<MethodTweener> set_trans(Tween::TransitionType p_trans);
+	Ref<MethodTweener> set_trans(Tween::TransitionType p_trans, real_t p_param1 = INFINITY, real_t p_param2 = INFINITY);
 	Ref<MethodTweener> set_ease(Tween::EaseType p_ease);
 	Ref<MethodTweener> set_delay(double p_delay);
 
@@ -286,12 +302,17 @@ public:
 
 protected:
 	static void _bind_methods();
+#ifndef DISABLE_DEPRECATED
+	Ref<MethodTweener> _set_trans_bind_compat_82155(Tween::TransitionType p_trans);
 
+	static void _bind_compatibility_methods();
+#endif
 private:
 	double duration = 0;
 	double delay = 0;
 	Tween::TransitionType trans_type = Tween::TRANS_MAX;
 	Tween::EaseType ease_type = Tween::EASE_MAX;
+	real_t trans_params[Tween::PARAM_COUNT] = { INFINITY, INFINITY };
 
 	Variant initial_val;
 	Variant delta_val;
