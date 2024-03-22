@@ -263,7 +263,7 @@ void SpriteFrames::_set_animations(const Array &p_animations) {
 		Anim anim;
 		anim.speed = d["speed"];
 		anim.loop = d["loop"];
-		anim.auto_transition = d.has("auto_transition") ? d["auto_transition"] : 0;
+		anim.auto_transition = d.has("auto_transition") ? static_cast<int>(d["auto_transition"]) : static_cast<int>(0);
 		Array frames = d["frames"];
 		for (int j = 0; j < frames.size(); j++) {
 #ifndef DISABLE_DEPRECATED
@@ -281,7 +281,7 @@ void SpriteFrames::_set_animations(const Array &p_animations) {
 			ERR_CONTINUE(!f.has("texture"));
 			ERR_CONTINUE(!f.has("duration"));
 
-			Frame frame = { f["texture"], MAX(SPRITE_FRAME_MINIMUM_DURATION, (float)f["duration"]) , f.has("callback") ? f["callback"] : 0};
+			Frame frame = { f["texture"], MAX(SPRITE_FRAME_MINIMUM_DURATION, (float)f["duration"]) , f.has("callback") ? static_cast<int>(f["callback"]) : static_cast<int>(0)};
 			anim.frames.push_back(frame);
 		}
 
