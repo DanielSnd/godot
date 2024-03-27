@@ -135,6 +135,8 @@ public:
 	void set_current_rendering_driver_name(const String &p_driver_name) { _current_rendering_driver_name = p_driver_name; }
 	void set_current_rendering_method(const String &p_name) { _current_rendering_method = p_name; }
 	void set_gles_over_gl(bool p_enabled) { _is_gles_over_gl = p_enabled; }
+	
+	void add_extra_logger(Logger *p_logger);
 
 	String get_current_rendering_driver_name() const { return _current_rendering_driver_name; }
 	String get_current_rendering_method() const { return _current_rendering_method; }
