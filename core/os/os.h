@@ -129,6 +129,8 @@ public:
 
 	static OS *get_singleton();
 
+	void add_extra_logger(Logger *p_logger);
+
 	String get_current_rendering_driver_name() const { return _current_rendering_driver_name; }
 	String get_current_rendering_method() const { return _current_rendering_method; }
 
