@@ -1557,10 +1557,6 @@ public:
 	virtual void canvas_light_occluder_reset_physics_interpolation(RID p_occluder) = 0;
 	virtual void canvas_light_occluder_transform_physics_interpolation(RID p_occluder, const Transform2D &p_transform) = 0;
 
-	virtual void canvas_light_occluder_set_interpolated(RID p_occluder, bool p_interpolated) = 0;
-	virtual void canvas_light_occluder_reset_physics_interpolation(RID p_occluder) = 0;
-	virtual void canvas_light_occluder_transform_physics_interpolation(RID p_occluder, const Transform2D &p_transform) = 0;
-
 	/* CANVAS LIGHT OCCLUDER POLYGON */
 
 	virtual RID canvas_occluder_polygon_create() = 0;

@@ -975,10 +975,6 @@ public:
 	FUNC1(canvas_light_occluder_reset_physics_interpolation, RID)
 	FUNC2(canvas_light_occluder_transform_physics_interpolation, RID, const Transform2D &)
 
-	FUNC2(canvas_light_occluder_set_interpolated, RID, bool)
-	FUNC1(canvas_light_occluder_reset_physics_interpolation, RID)
-	FUNC2(canvas_light_occluder_transform_physics_interpolation, RID, const Transform2D &)
-
 	FUNCRIDSPLIT(canvas_occluder_polygon)
 	FUNC3(canvas_occluder_polygon_set_shape, RID, const Vector<Vector2> &, bool)
 

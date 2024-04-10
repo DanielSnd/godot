@@ -320,10 +320,6 @@ public:
 	void canvas_light_occluder_reset_physics_interpolation(RID p_occluder);
 	void canvas_light_occluder_transform_physics_interpolation(RID p_occluder, const Transform2D &p_transform);
 
-	void canvas_light_occluder_set_interpolated(RID p_occluder, bool p_interpolated);
-	void canvas_light_occluder_reset_physics_interpolation(RID p_occluder);
-	void canvas_light_occluder_transform_physics_interpolation(RID p_occluder, const Transform2D &p_transform);
-
 	RID canvas_occluder_polygon_allocate();
 	void canvas_occluder_polygon_initialize(RID p_rid);
 
