@@ -2012,11 +2012,6 @@ void RendererCanvasCull::canvas_light_occluder_transform_physics_interpolation(R
 	ERR_FAIL_NULL(occluder);
 	occluder->xform_prev = p_transform * occluder->xform_prev;
 	occluder->xform_curr = p_transform * occluder->xform_curr;
-void RendererCanvasCull::canvas_light_occluder_set_z_index(RID p_occluder, int p_z_index) {
-	RendererCanvasRender::LightOccluderInstance *occluder = canvas_light_occluder_owner.get_or_null(p_occluder);
-	ERR_FAIL_NULL(occluder);
-
-	occluder->z_index = p_z_index;
 }
 
 void RendererCanvasCull::canvas_light_occluder_set_z_index(RID p_occluder, int p_z_index) {
