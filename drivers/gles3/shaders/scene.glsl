@@ -1844,22 +1844,15 @@ void main() {
 #endif // !MODE_RENDER_DEPTH
 
 #if defined(USE_SHADOW_TO_OPACITY)
-	alpha = min(alpha, clamp(length(ambient_light), 0.0, 1.0));
+#ifndef MODE_RENDER_DEPTH
+    alpha = min(alpha, clamp(length(ambient_light), 0.0, 1.0));
 
 #if defined(ALPHA_SCISSOR_USED)
-	if (alpha < alpha_scissor) {
-		discard;
-	}
-#else
-#ifdef MODE_RENDER_DEPTH
-#ifdef USE_OPAQUE_PREPASS
-
-	if (alpha < opaque_prepass_threshold) {
-		discard;
-	}
-#endif // USE_OPAQUE_PREPASS
-#endif // MODE_RENDER_DEPTH
+    if (alpha < alpha_scissor) {
+        discard;
+    }
 #endif // !ALPHA_SCISSOR_USED
+#endif // !MODE_RENDER_DEPTH
 
 #endif // USE_SHADOW_TO_OPACITY
 
