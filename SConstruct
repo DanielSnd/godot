@@ -202,7 +202,7 @@ opts.Add(BoolVariable("use_volk", "Use the volk library to load the Vulkan loade
 opts.Add(BoolVariable("accesskit", "Use AccessKit C SDK", True))
 opts.Add(("accesskit_sdk_path", "Path to the AccessKit C SDK", ""))
 opts.Add(BoolVariable("sdl", "Enable the SDL3 input driver", True))
-
+opts.Add(BoolVariable("use_breakpad", "Enable Breakpad crash dump creation.", True))
 # Advanced options
 opts.Add(
     BoolVariable(
@@ -555,6 +555,9 @@ if not env["deprecated"]:
 
 if env["precision"] == "double":
     env.Append(CPPDEFINES=["REAL_T_IS_DOUBLE"])
+
+if env["use_breakpad"]:
+    env.Append(CPPDEFINES=["USE_BREAKPAD"])
 
 # Default num_jobs to local cpu count if not user specified.
 # SCons has a peculiarity where user-specified options won't be overridden
