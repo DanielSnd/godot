@@ -516,7 +516,7 @@ if env["precision"] == "double":
     env.Append(CPPDEFINES=["REAL_T_IS_DOUBLE"])
 
 if env["use_breakpad"]:
-    env_base.Append(CPPDEFINES=["USE_BREAKPAD"])
+    env.Append(CPPDEFINES=["USE_BREAKPAD"])
 
 # Default num_jobs to local cpu count if not user specified.
 # SCons has a peculiarity where user-specified options won't be overridden
