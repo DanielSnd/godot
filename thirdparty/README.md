@@ -82,7 +82,7 @@ Patches:
 ## breakpad
 
 - Upstream: https://chromium.googlesource.com/breakpad/breakpad/
-- Version: git (605c51ed96ad44b34c457bbca320e74e194c317e, 2021)
+- Version: git (527331a471207d28d015e210c12fb8bb8b6732fd, 2024)
 - License: BSD-3-Clause (main), others
 
 Files extracted from upstream source:
