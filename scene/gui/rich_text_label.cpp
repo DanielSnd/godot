@@ -626,6 +626,16 @@ float RichTextLabel::_shape_line(ItemFrame *p_frame, int p_line, const Ref<Font>
 						t_char_count += cell_ch;
 						remaining_characters -= cell_ch;
 
+						
+						int min_width_override = frame->min_size_over.x;
+						int max_width_override = frame->max_size_over.x;
+						if (min_width_override > 0) {
+							table->columns[column].min_width = MIN(min_width_override,table->columns[column].min_width);
+						}
+						if (max_width_override > 0) {
+							table->columns[column].max_width = MAX(max_width_override,table->columns[column].max_width);
+						}
+
 						table->columns[column].min_width = MAX(table->columns[column].min_width, frame->lines[i].indent + ceil(frame->lines[i].text_buf->get_size().x));
 						table->columns[column].max_width = MAX(table->columns[column].max_width, frame->lines[i].indent + ceil(frame->lines[i].text_buf->get_non_wrapped_size().x));
 					}
