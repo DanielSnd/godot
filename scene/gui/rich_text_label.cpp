@@ -630,6 +630,16 @@ float RichTextLabel::_shape_line(ItemFrame *p_frame, int p_line, const Ref<Font>
 						t_char_count += cell_ch;
 						remaining_characters -= cell_ch;
 
+						
+						int min_width_override = frame->min_size_over.x;
+						int max_width_override = frame->max_size_over.x;
+						if (min_width_override > 0) {
+							table->columns[column].min_width = MIN(min_width_override,table->columns[column].min_width);
+						}
+						if (max_width_override > 0) {
+							table->columns[column].max_width = MAX(max_width_override,table->columns[column].max_width);
+						}
+
 						table->columns[column].min_width = MAX(table->columns[column].min_width, frame->lines[i].indent + ceil(frame->lines[i].text_buf->get_size().x));
 						table->columns[column].max_width = MAX(table->columns[column].max_width, frame->lines[i].indent + ceil(frame->lines[i].text_buf->get_non_wrapped_size().x));
 					}
@@ -5765,13 +5775,19 @@ void RichTextLabel::append_text(const String &p_bbcode) {
 			push_outline_color(color);
 			pos = brk_end + 1;
 			tag_stack.push_front("outline_color");
-
 		} else if (tag.begins_with("font_size=")) {
 			int fnt_size = _get_tag_value(tag).to_int();
+			if (tag.length() > 10 && (tag[10] == static_cast<char32_t>('+') || tag[10] == static_cast<char32_t>('-'))) {
+				int add_font_size = tag.substr(11, tag.length()).to_int();
+				if (tag[10] == static_cast<char32_t>('+')) {
+					fnt_size = theme_cache.normal_font_size + add_font_size;
+				} else {
+					fnt_size = theme_cache.normal_font_size - add_font_size;
+				}
+			}
 			push_font_size(fnt_size);
 			pos = brk_end + 1;
 			tag_stack.push_front("font_size");
-
 		} else if (tag.begins_with("opentype_features=") || tag.begins_with("otf=")) {
 			int value_pos = tag.find_char('=');
 			String fnt_ftr = tag.substr(value_pos + 1);
@@ -5815,7 +5831,6 @@ void RichTextLabel::append_text(const String &p_bbcode) {
 			}
 			pos = brk_end + 1;
 			tag_stack.push_front(tag.substr(0, value_pos));
-
 		} else if (tag.begins_with("font=")) {
 			String fnt = _get_tag_value(tag).unquote();
 
