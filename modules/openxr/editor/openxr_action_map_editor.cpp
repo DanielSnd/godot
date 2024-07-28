@@ -259,6 +259,13 @@ void OpenXRActionMapEditor::_load_action_map(const String p_path, bool p_create_
 			if (err != OK) {
 				// show warning but continue
 				EditorNode::get_singleton()->show_warning(vformat(TTR("Error saving file %s: %s"), edited_path, error_names[err]));
+			} else {
+				// Reload so it's cached
+				action_map = ResourceLoader::load(p_path, "", ResourceFormatLoader::CACHE_MODE_REUSE, &err);
+				if (err != OK) {
+					// show warning but continue
+					EditorNode::get_singleton()->show_warning(vformat(TTR("Error reloading file %s: %s"), edited_path, error_names[err]));
+				}
 			}
 
 		} else {
