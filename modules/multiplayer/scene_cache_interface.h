@@ -53,6 +53,7 @@ private:
 		ObjectID oid;
 		NodePath path;
 
+		RecvNode();
 		RecvNode(const ObjectID &p_oid, const NodePath &p_path) {
 			oid = p_oid;
 			path = p_path;
