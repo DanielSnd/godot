@@ -101,7 +101,7 @@ void SceneCacheInterface::transfer_peer_id_ownership(int p_from_id, int p_to_id,
 	if (pinfo_from == nullptr || pinfo_to == nullptr)
 		return;
 
-	for (KeyValue<int, ObjectID> E : pinfo_from->recv_nodes) {
+	for (KeyValue<int, RecvNode> E : pinfo_from->recv_nodes) {
 		pinfo_to->recv_nodes[E.key] = E.value;
 	}
 	for (const ObjectID &oid : pinfo_from->sent_nodes) {
