@@ -93,11 +93,19 @@ class VideoStreamPlaybackTheora : public VideoStreamPlayback {
 
 	double last_update_time = 0;
 	double time = 0;
+	double duration_length = 0;
 	double delay_compensation = 0;
 
 	Ref<ImageTexture> texture;
 
 	bool paused = false;
+
+	struct KeyframeIndex {
+		double timestamp;
+		uint64_t offset;
+		ogg_int64_t gran_pos;
+	};
+	Vector<KeyframeIndex> keyframe_index;
 
 #ifdef THEORA_USE_THREAD_STREAMING
 
