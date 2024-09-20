@@ -338,6 +338,50 @@ void VideoStreamPlaybackTheora::set_file(const String &p_file) {
 		Ref<Image> img = Image::create_empty(w, h, false, Image::FORMAT_RGBA8);
 		texture->set_image(img);
 
+		
+		// Build keyframe index
+		uint64_t current_offset = 0;
+		double last_keyframe_time = 0;
+		const double keyframe_interval = 0.1;
+		keyframe_index.clear();
+
+		// Seek to the beginning of the file
+		file->seek(0);
+		ogg_sync_reset(&oy);
+
+		while (!file->eof_reached()) {
+			int buffer_size = 4096;
+			char *buffer = ogg_sync_buffer(&oy, buffer_size);
+			int bytes = file->get_buffer((uint8_t*)buffer, buffer_size);
+			ogg_sync_wrote(&oy, bytes);
+
+			while (ogg_sync_pageout(&oy, &og) > 0) {
+				if (ogg_page_serialno(&og) == to.serialno) {
+					ogg_int64_t granulepos = ogg_page_granulepos(&og);
+					if (granulepos >= 0) {
+						double timestamp = th_granule_time(&ti, granulepos);
+						if (timestamp > duration_length) {
+							duration_length = timestamp;
+						}
+
+						// Only index keyframes at specified intervals
+						if (timestamp - last_keyframe_time >= keyframe_interval) {
+							KeyframeIndex ki{};
+							ki.timestamp = timestamp;
+							ki.offset = current_offset;
+							ki.gran_pos = granulepos;
+							keyframe_index.push_back(ki);
+							last_keyframe_time = timestamp;
+						}
+					}
+				}
+				current_offset = file->get_position();
+			}
+		}
+
+		// Seek back to the beginning of the file
+		file->seek(0);
+		ogg_sync_reset(&oy);
 	} else {
 		/* tear down the partial theora setup */
 		th_info_clear(&ti);
@@ -374,136 +418,134 @@ Ref<Texture2D> VideoStreamPlaybackTheora::get_texture() const {
 }
 
 void VideoStreamPlaybackTheora::update(double p_delta) {
-	if (file.is_null()) {
-		return;
-	}
+    if (file.is_null()) {
+        return;
+    }
 
-	if (!playing || paused) {
-		//printf("not playing\n");
-		return;
-	}
+    if (!playing || paused) {
+        return;
+    }
 
 #ifdef THEORA_USE_THREAD_STREAMING
-	thread_sem->post();
+    thread_sem->post();
 #endif
 
-	time += p_delta;
+    time += p_delta;
 
-	if (videobuf_time > get_time()) {
-		return; //no new frames need to be produced
-	}
+    if (videobuf_time > get_time()) {
+        return; //no new frames need to be produced
+    }
 
-	bool frame_done = false;
-	bool audio_done = !vorbis_p;
+    bool frame_done = false;
+    bool audio_done = !vorbis_p;
 
-	while (!frame_done || (!audio_done && !vorbis_eos)) {
-		//a frame needs to be produced
+    while (!frame_done || (!audio_done && !vorbis_eos)) {
+        //a frame needs to be produced
 
-		ogg_packet op;
-		bool no_theora = false;
-		bool buffer_full = false;
+        ogg_packet op;
+        bool no_theora = false;
+        bool buffer_full = false;
 
-		while (vorbis_p && !audio_done && !buffer_full) {
-			int ret;
-			float **pcm;
+        while (vorbis_p && !audio_done && !buffer_full) {
+            int ret;
+            float **pcm;
 
-			/* if there's pending, decoded audio, grab it */
-			ret = vorbis_synthesis_pcmout(&vd, &pcm);
-			if (ret > 0) {
-				const int AUXBUF_LEN = 4096;
-				int to_read = ret;
-				float aux_buffer[AUXBUF_LEN];
+            /* if there's pending, decoded audio, grab it */
+            ret = vorbis_synthesis_pcmout(&vd, &pcm);
+            if (ret > 0) {
+                const int AUXBUF_LEN = 4096;
+                int to_read = ret;
+                float aux_buffer[AUXBUF_LEN];
 
-				while (to_read) {
-					int m = MIN(AUXBUF_LEN / vi.channels, to_read);
+                while (to_read) {
+                    int m = MIN(AUXBUF_LEN / vi.channels, to_read);
 
-					int count = 0;
+                    int count = 0;
 
-					for (int j = 0; j < m; j++) {
-						for (int i = 0; i < vi.channels; i++) {
-							aux_buffer[count++] = pcm[i][j];
-						}
-					}
+                    for (int j = 0; j < m; j++) {
+                        for (int i = 0; i < vi.channels; i++) {
+                            aux_buffer[count++] = pcm[i][j];
+                        }
+                    }
 
-					if (mix_callback) {
-						int mixed = mix_callback(mix_udata, aux_buffer, m);
-						to_read -= mixed;
-						if (mixed != m) { //could mix no more
-							buffer_full = true;
-							break;
-						}
-					} else {
-						to_read -= m; //just pretend we sent the audio
-					}
-				}
+                    if (mix_callback) {
+                        int mixed = mix_callback(mix_udata, aux_buffer, m);
+                        to_read -= mixed;
+                        if (mixed != m) { //could mix no more
+                            buffer_full = true;
+                            break;
+                        }
+                    } else {
+                        to_read -= m; //just pretend we sent the audio
+                    }
+                }
 
-				vorbis_synthesis_read(&vd, ret - to_read);
+                vorbis_synthesis_read(&vd, ret - to_read);
 
-				audio_frames_wrote += ret - to_read;
+                audio_frames_wrote += ret - to_read;
 
-			} else {
-				/* no pending audio; is there a pending packet to decode? */
-				if (ogg_stream_packetout(&vo, &op) > 0) {
-					if (vorbis_synthesis(&vb, &op) == 0) { /* test for success! */
-						vorbis_synthesis_blockin(&vd, &vb);
-					}
-				} else { /* we need more data; break out to suck in another page */
-					break;
-				}
-			}
+            } else {
+                /* no pending audio; is there a pending packet to decode? */
+                if (ogg_stream_packetout(&vo, &op) > 0) {
+                    if (vorbis_synthesis(&vb, &op) == 0) { /* test for success! */
+                        vorbis_synthesis_blockin(&vd, &vb);
+                    }
+                } else { /* we need more data; break out to suck in another page */
+                    break;
+                }
+            }
 
-			audio_done = videobuf_time < (audio_frames_wrote / float(vi.rate));
+            audio_done = videobuf_time < (audio_frames_wrote / float(vi.rate));
 
-			if (buffer_full) {
-				break;
-			}
-		}
+            if (buffer_full) {
+                break;
+            }
+        }
 
-		while (theora_p && !frame_done) {
-			/* theora is one in, one out... */
-			if (ogg_stream_packetout(&to, &op) > 0) {
-				/*HACK: This should be set after a seek or a gap, but we might not have
-				a granulepos for the first packet (we only have them for the last
-				packet on a page), so we just set it as often as we get it.
-				To do this right, we should back-track from the last packet on the
-				page and compute the correct granulepos for the first packet after
-				a seek or a gap.*/
-				if (op.granulepos >= 0) {
-					th_decode_ctl(td, TH_DECCTL_SET_GRANPOS, &op.granulepos,
-							sizeof(op.granulepos));
-				}
-				ogg_int64_t videobuf_granulepos;
-				if (th_decode_packetin(td, &op, &videobuf_granulepos) == 0) {
-					videobuf_time = th_granule_time(td, videobuf_granulepos);
+        while (theora_p && !frame_done) {
+            /* theora is one in, one out... */
+            if (ogg_stream_packetout(&to, &op) > 0) {
+                /*HACK: This should be set after a seek or a gap, but we might not have
+                a granulepos for the first packet (we only have them for the last
+                packet on a page), so we just set it as often as we get it.
+                To do this right, we should back-track from the last packet on the
+                page and compute the correct granulepos for the first packet after
+                a seek or a gap.*/
+                if (op.granulepos >= 0) {
+                    th_decode_ctl(td, TH_DECCTL_SET_GRANPOS, &op.granulepos,
+                            sizeof(op.granulepos));
+                }
+                ogg_int64_t videobuf_granulepos;
+                if (th_decode_packetin(td, &op, &videobuf_granulepos) == 0) {
+                    videobuf_time = th_granule_time(td, videobuf_granulepos);
 
-					//printf("frame time %f, play time %f, ready %i\n", (float)videobuf_time, get_time(), videobuf_ready);
+                    //printf("frame time %f, play time %f, ready %i\n", (float)videobuf_time, get_time(), videobuf_ready);
 
-					/* is it already too old to be useful? This is only actually
-					 useful cosmetically after a SIGSTOP. Note that we have to
-					 decode the frame even if we don't show it (for now) due to
-					 keyframing. Soon enough libtheora will be able to deal
-					 with non-keyframe seeks.  */
+                    /* is it already too old to be useful? This is only actually
+                    useful cosmetically after a SIGSTOP. Note that we have to
+                    decode the frame even if we don't show it (for now) due to
+                    keyframing. Soon enough libtheora will be able to deal
+                    with non-keyframe seeks.  */
 
-					if (videobuf_time >= get_time()) {
-						frame_done = true;
-					} else {
-						/*If we are too slow, reduce the pp level.*/
-						pp_inc = pp_level > 0 ? -1 : 0;
-					}
-				}
-
-			} else {
-				no_theora = true;
-				break;
-			}
-		}
+                    if (videobuf_time >= get_time()) {
+                        frame_done = true;
+                    } else {
+                        /*If we are too slow, reduce the pp level.*/
+                        pp_inc = pp_level > 0 ? -1 : 0;
+                    }
+                }
+            } else {
+                no_theora = true;
+                break;
+            }
+        }
 
 #ifdef THEORA_USE_THREAD_STREAMING
 		if (file.is_valid() && thread_eof && no_theora && theora_eos && ring_buffer.data_left() == 0) {
 #else
 		if (file.is_valid() && /*!videobuf_ready && */ no_theora && theora_eos) {
 #endif
-			//printf("video done, stopping\n");
+			// print_line(vformat("video done, stopping!! file is valid %s no theora %s theora eos %s",file.is_valid(), no_theora,theora_eos));
 			stop();
 			return;
 		}
@@ -521,12 +563,12 @@ void VideoStreamPlaybackTheora::update(double p_delta) {
 		//if(stateflag) audio_write_nonblocking();
 
 		/* are we at or past time for this video frame? */
-		if (videobuf_ready && videobuf_time <= get_time()) {
-			//video_write();
-			//videobuf_ready=0;
-		} else {
-			//printf("frame at %f not ready (time %f), ready %i\n", (float)videobuf_time, get_time(), videobuf_ready);
-		}
+		// if (videobuf_ready && videobuf_time <= get_time()) {
+		// 	//video_write();
+		// 	//videobuf_ready=0;
+		// } else {
+		// 	// printf("frame at %f not ready (time %f), ready %i\n", (float)videobuf_time, get_time(), videobuf_ready);
+		// }
 
 		double tdiff = videobuf_time - get_time();
 		/*If we have lots of extra time, increase the post-processing level.*/
@@ -537,11 +579,14 @@ void VideoStreamPlaybackTheora::update(double p_delta) {
 		}
 	}
 
-	video_write();
+	if (frame_done) {
+		video_write();
+	}
 }
 
 void VideoStreamPlaybackTheora::play() {
 	if (!playing) {
+		// print_line("VIDEOSTREAM Setting time 0 from play()");
 		time = 0;
 	} else {
 		stop();
@@ -574,7 +619,7 @@ bool VideoStreamPlaybackTheora::is_paused() const {
 }
 
 double VideoStreamPlaybackTheora::get_length() const {
-	return 0;
+	return duration_length;
 }
 
 double VideoStreamPlaybackTheora::get_playback_position() const {
@@ -582,7 +627,83 @@ double VideoStreamPlaybackTheora::get_playback_position() const {
 }
 
 void VideoStreamPlaybackTheora::seek(double p_time) {
-	WARN_PRINT_ONCE("Seeking in Theora videos is not implemented yet (it's only supported for GDExtension-provided video streams).");
+	if (keyframe_index.is_empty()) {
+		WARN_PRINT("Keyframe index is empty. Falling back to play().");
+		play();
+		return;
+	}
+	// Calculate compensated time
+	double compensated_time = MAX(p_time + delay_compensation,0.0);
+
+	// Find the nearest keyframe before the requested time.
+	KeyframeIndex target_keyframe = keyframe_index[0];
+	for (const KeyframeIndex &kf: keyframe_index) {
+		if (kf.timestamp <= compensated_time) {
+			target_keyframe = kf;
+		} else {
+			break;
+		}
+	}
+	
+	// Seek to the keyframe's offset
+	file->seek(target_keyframe.offset);
+
+	// Reset OGG and codec states
+	ogg_sync_reset(&oy);
+	if (vorbis_p) {
+		ogg_stream_reset(&vo);
+		vorbis_synthesis_restart(&vd);
+	}
+	if (theora_p) {
+		ogg_stream_reset(&to);
+	}
+
+	// Set the playback position
+	time = compensated_time;
+	
+	// Reset audio buffer and calculate the new audio_frames_wrote
+	audio_frames_wrote = compensated_time * vi.rate;
+
+	// Decode frames until we reach the target time
+	bool frame_done = false;
+	while (!frame_done) {
+		buffer_data();
+		while (ogg_sync_pageout(&oy, &og) > 0) {
+			queue_page(&og);
+		}
+
+		while (theora_p && !frame_done) {
+			ogg_packet op;
+			int ret = ogg_stream_packetout(&to, &op);
+			if (ret > 0) {
+				if (op.granulepos >= 0) {
+					th_decode_ctl(td, TH_DECCTL_SET_GRANPOS, &op.granulepos, sizeof(op.granulepos));
+				}
+				if (th_decode_packetin(td, &op, NULL) == 0) {
+					videobuf_time = th_granule_time(td, op.granulepos);
+					if (videobuf_time >= compensated_time) {
+						frame_done = true;
+						video_write();
+					}
+				}
+			} else if (ret == 0) {
+				break;
+			}
+		}
+	}
+
+	// Ensure audio is synced up to this point
+	while (vorbis_p) {
+		ogg_packet op;
+		int ret = ogg_stream_packetout(&vo, &op);
+		if (ret > 0) {
+			if (vorbis_synthesis(&vb, &op) == 0) {
+				vorbis_synthesis_blockin(&vd, &vb);
+			}
+		} else if (ret == 0) {
+			break;
+		}
+	}
 }
 
 int VideoStreamPlaybackTheora::get_channels() const {
