@@ -390,17 +390,18 @@ vec3 light_normal_compute(vec3 light_vec, vec3 normal, vec3 base_color, vec3 lig
 	}
 }
 
-float layeredShadowSampleUsingDistance(vec4 shadow_uv,float distance) {
+float layeredShadowSampleUsingDistance(vec4 shadow_uv,float distance, int z_index) {
 	float shadow_value = textureProjLod(sampler2D(shadow_atlas_texture, shadow_sampler), shadow_uv, 0.0).x;
 
-	if ((shadow_value > draw_data.z_index && fract(shadow_value) < distance) || 1.0 - step((distance - shadow_value),0.035) > 0.5) {
+	if ((shadow_value > z_index && fract(shadow_value) < distance) || 1.0 - step((distance - shadow_value),0.035) > 0.5) {
 		return 1.0;
 	}
 	return 0.0; // no shadow
 }
-float layeredShadowSample(vec4 shadow_uv) {
+float layeredShadowSample(vec4 shadow_uv, int z_index) {
+	
 	float shadow_value = textureProjLod(sampler2D(shadow_atlas_texture, shadow_sampler), shadow_uv, 0.0).x;
-	if (shadow_value > draw_data.z_index && fract(shadow_value) < shadow_uv.z) {
+	if (shadow_value > z_index && fract(shadow_value) < shadow_uv.z) {
 		return 1.0;
 	}
 	return 0.0; // no shadow
@@ -413,37 +414,42 @@ vec4 light_shadow_compute_positional(uint light_base, vec4 light_color, vec4 sha
 		vec3 shadow_modulate
 #endif
 ) {
+#ifdef USE_ATTRIBUTES
+	const InstanceData draw_data = instances.data[params.base_instance_index];
+#else
+	const InstanceData draw_data = instances.data[instance_index];
+#endif // USE_ATTRIBUTES
 	float shadow;
 	uint shadow_mode = light_array.data[light_base].flags & LIGHT_FLAGS_FILTER_MASK;
 
 	vec4 shadow_pixel_size = vec4(light_array.data[light_base].shadow_pixel_size, 0.0, 0.0, 0.0);
 	if (shadow_mode == LIGHT_FLAGS_SHADOW_NEAREST) {
-		shadow = layeredShadowSampleUsingDistance(shadow_uv,original_distance);
+		shadow = layeredShadowSampleUsingDistance(shadow_uv,original_distance, draw_data.z_index);
 	} else if (shadow_mode == LIGHT_FLAGS_SHADOW_PCF5) {
 		vec4 shadow_pixel_size = vec4(light_array.data[light_base].shadow_pixel_size, 0.0, 0.0, 0.0);
 		shadow = 0.0;
-		shadow += layeredShadowSampleUsingDistance(shadow_uv - shadow_pixel_size * 2.0,original_distance);
-		shadow += layeredShadowSampleUsingDistance(shadow_uv - shadow_pixel_size,original_distance);
-		shadow += layeredShadowSampleUsingDistance(shadow_uv,original_distance);
-		shadow += layeredShadowSampleUsingDistance(shadow_uv + shadow_pixel_size,original_distance);
-		shadow += layeredShadowSampleUsingDistance(shadow_uv + shadow_pixel_size * 2.0,original_distance);
+		shadow += layeredShadowSampleUsingDistance(shadow_uv - shadow_pixel_size * 2.0,original_distance, draw_data.z_index);
+		shadow += layeredShadowSampleUsingDistance(shadow_uv - shadow_pixel_size,original_distance, draw_data.z_index);
+		shadow += layeredShadowSampleUsingDistance(shadow_uv,original_distance, draw_data.z_index);
+		shadow += layeredShadowSampleUsingDistance(shadow_uv + shadow_pixel_size,original_distance, draw_data.z_index);
+		shadow += layeredShadowSampleUsingDistance(shadow_uv + shadow_pixel_size * 2.0,original_distance, draw_data.z_index);
 		shadow /= 5.0;
 	} else { //PCF13
 		vec4 shadow_pixel_size = vec4(light_array.data[light_base].shadow_pixel_size, 0.0, 0.0, 0.0);
 		shadow = 0.0;
-		shadow += layeredShadowSample(shadow_uv - shadow_pixel_size * 6.0);
-		shadow += layeredShadowSample(shadow_uv - shadow_pixel_size * 5.0);
-		shadow += layeredShadowSample(shadow_uv - shadow_pixel_size * 4.0);
-		shadow += layeredShadowSample(shadow_uv - shadow_pixel_size * 3.0);
-		shadow += layeredShadowSample(shadow_uv - shadow_pixel_size * 2.0);
-		shadow += layeredShadowSample(shadow_uv - shadow_pixel_size);
-		shadow += layeredShadowSample(shadow_uv);
-		shadow += layeredShadowSample(shadow_uv + shadow_pixel_size);
-		shadow += layeredShadowSample(shadow_uv + shadow_pixel_size * 2.0);
-		shadow += layeredShadowSample(shadow_uv + shadow_pixel_size * 3.0);
-		shadow += layeredShadowSample(shadow_uv + shadow_pixel_size * 4.0);
-		shadow += layeredShadowSample(shadow_uv + shadow_pixel_size * 5.0);
-		shadow += layeredShadowSample(shadow_uv + shadow_pixel_size * 6.0);
+		shadow += layeredShadowSample(shadow_uv - shadow_pixel_size * 6.0, draw_data.z_index);
+		shadow += layeredShadowSample(shadow_uv - shadow_pixel_size * 5.0, draw_data.z_index);
+		shadow += layeredShadowSample(shadow_uv - shadow_pixel_size * 4.0, draw_data.z_index);
+		shadow += layeredShadowSample(shadow_uv - shadow_pixel_size * 3.0, draw_data.z_index);
+		shadow += layeredShadowSample(shadow_uv - shadow_pixel_size * 2.0, draw_data.z_index);
+		shadow += layeredShadowSample(shadow_uv - shadow_pixel_size, draw_data.z_index);
+		shadow += layeredShadowSample(shadow_uv, draw_data.z_index);
+		shadow += layeredShadowSample(shadow_uv + shadow_pixel_size, draw_data.z_index);
+		shadow += layeredShadowSample(shadow_uv + shadow_pixel_size * 2.0, draw_data.z_index);
+		shadow += layeredShadowSample(shadow_uv + shadow_pixel_size * 3.0, draw_data.z_index);
+		shadow += layeredShadowSample(shadow_uv + shadow_pixel_size * 4.0, draw_data.z_index);
+		shadow += layeredShadowSample(shadow_uv + shadow_pixel_size * 5.0, draw_data.z_index);
+		shadow += layeredShadowSample(shadow_uv + shadow_pixel_size * 6.0, draw_data.z_index);
 		shadow /= 13.0;
 	}
 
@@ -527,6 +533,12 @@ float msdf_median(float r, float g, float b, float a) {
 }
 
 vec4 texture_sample_shadow_zindex(vec4 in_pos_z_index) {
+#ifdef USE_ATTRIBUTES
+	const InstanceData draw_data = instances.data[params.base_instance_index];
+#else
+	const InstanceData draw_data = instances.data[instance_index];
+#endif // USE_ATTRIBUTES
+
 	float adjust_value = in_pos_z_index.w < 0.0 ? 0.035 : in_pos_z_index.w;
 	uint light_count = (draw_data.flags >> FLAGS_LIGHT_COUNT_SHIFT) & 0xF; //max 16 lights
 	vec2 p_sdf = (canvas_data.canvas_transform * vec4(in_pos_z_index.x,in_pos_z_index.y, 0.0, 1.0)).xy;
@@ -608,6 +620,12 @@ vec4 texture_sample_shadow(vec2 p_sdf) {
 }
 
 vec4 texture_sample_light(vec2 p_sdf) {
+#ifdef USE_ATTRIBUTES
+	const InstanceData draw_data = instances.data[params.base_instance_index];
+#else
+	const InstanceData draw_data = instances.data[instance_index];
+#endif // USE_ATTRIBUTES
+
 	uint light_count = (draw_data.flags >> FLAGS_LIGHT_COUNT_SHIFT) & 0xF; //max 16 lights
 	p_sdf = (canvas_data.canvas_transform * vec4(p_sdf, 0.0, 1.0)).xy;
 	vec4 return_color = vec4(0.0);
@@ -655,41 +673,6 @@ vec4 texture_sample_light(vec2 p_sdf) {
 	}
 	return return_color;
 }
-
-//
-//vec4 texture_sample_shadow(vec2 p_sdf) {
-//	uint light_count = (draw_data.flags >> FLAGS_LIGHT_COUNT_SHIFT) & 0xF; //max 16 lights
-//	p_sdf = (canvas_data.canvas_transform * vec4(p_sdf, 0.0, 1.0)).xy;
-//
-//	float return_found_shadow = 0.0;
-//	float return_found_shadow_uv_z = 0.0;
-//	float return_distance = 0.0;
-//	float return_shadow_no_limit_sample;
-//	for (uint i = 0; i < MAX_LIGHTS_PER_ITEM; i++) {
-//		if (i >= light_count) {	break; }
-//		uint light_base = draw_data.lights[i >> 2];
-//		light_base >>= (i & 3) * 8;
-//		light_base &= 0xFF;
-//		if (!bool(light_array.data[light_base].flags & LIGHT_FLAGS_HAS_SHADOW))	continue;
-//		vec2 shadow_pos = (vec4(p_sdf, 0.0, 1.0) * mat4(light_array.data[light_base].shadow_matrix[0], light_array.data[light_base].shadow_matrix[1], vec4(0.0, 0.0, 1.0, 0.0), vec4(0.0, 0.0, 0.0, 1.0))).xy; //multiply inverse given its transposed. Optimizer removes useless operations.
-//		vec2 pos_norm = normalize(shadow_pos);
-//		vec2 pos_box = pos_norm / max(abs(pos_norm.x), abs(pos_norm.y));
-//		vec2 pos_rot = pos_norm * mat2(vec2(0.7071067811865476, -0.7071067811865476), vec2(0.7071067811865476, 0.7071067811865476)); //is there a faster way to 45 degrees rot?
-//		float tex_ofs = pos_rot.y > 0 ? (pos_rot.x > 0 ? pos_box.y * 0.125 + 0.125 : pos_box.x * -0.125 + (0.25 + 0.125)) : (pos_rot.x < 0 ? pos_box.y * -0.125 + (0.5 + 0.125) : pos_box.x * 0.125 + (0.75 + 0.125));
-//		float distance = (pos_rot.y > 0 ? (pos_rot.x > 0 ? shadow_pos.x : shadow_pos.y) : (pos_rot.x < 0 ? -shadow_pos.x : -shadow_pos.y));
-//		return_distance = distance;
-//		vec4 shadow_uv = vec4(tex_ofs, light_array.data[light_base].shadow_y_ofs, distance * light_array.data[light_base].shadow_zfar_inv, 1.0);
-//		return_found_shadow_uv_z = shadow_uv.z;
-//		float shadow_value =  textureProjLod(sampler2D(shadow_atlas_texture, shadow_sampler), shadow_uv, 0.0).x;
-//		return_shadow_no_limit_sample = shadow_value;
-//		if (shadow_value > draw_data.z_index && fract(shadow_value) < shadow_uv.z) {
-//			return_found_shadow += shadow_value;
-//		}
-//	}
-//
-//	float shadow_sample = (return_found_shadow > 0.0 && fract(return_found_shadow) < return_found_shadow_uv_z) ? 0.0 : 1.0;
-//	return vec4(return_shadow_no_limit_sample,return_found_shadow_uv_z,return_found_shadow,return_distance);
-//}
 
 void main() {
 	vec4 color = color_interp;
