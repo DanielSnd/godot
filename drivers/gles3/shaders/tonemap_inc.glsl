@@ -96,6 +96,20 @@ vec3 agx_contrast_approx(vec3 x) {
 	return 0.021 * x + 4.0111 * x2 - 25.682 * x2 * x + 70.359 * x4 - 74.778 * x4 * x + 27.069 * x4 * x2;
 }
 
+const mat3 LINEAR_SRGB_TO_LINEAR_REC2020 = mat3(
+		vec3(0.6274, 0.0691, 0.0164),
+		vec3(0.3293, 0.9195, 0.0880),
+		vec3(0.0433, 0.0113, 0.8956));
+
+vec3 tonemap_agx_punchy(vec3 color, float white, bool punchy) {
+	color = agx(color, white);
+	if (punchy) {
+		color = agx_look_punchy(color);
+	}
+	color = agx_eotf(color);
+	return color;
+}
+
 // This is an approximation and simplification of EaryChow's AgX implementation that is used by Blender.
 // This code is based off of the script that generates the AgX_Base_sRGB.cube LUT that Blender uses.
 // Source: https://github.com/EaryChow/AgX_LUT_Gen/blob/main/AgXBasesRGB.py
@@ -249,7 +263,7 @@ vec3 apply_tonemapping(vec3 color, float p_white) { // inputs are LINEAR
 	} else if (tonemapper == TONEMAPPER_AGX) {
 		return tonemap_agx(color);
 	} else { // TONEMAPPER_AGX_PUNCHY
-		return tonemap_agx(max(vec3(0.0f), color), p_white, true);
+		return tonemap_agx_punchy(max(vec3(0.0f), color), p_white, true);
 	}
 }
 
