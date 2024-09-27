@@ -27,9 +27,6 @@ vec3 srgb_to_linear(vec3 color) {
 
 #ifdef APPLY_TONEMAPPING
 
-vec3 tonemap_reinhard(vec3 color, float p_white) {
-	return (p_white * color + color) / (color * p_white + p_white);
-}
 
 vec3 tonemap_filmic(vec3 color, float p_white) {
 	// exposure bias: input scale (color *= bias, white *= bias) to make the brightness consistent with other tonemappers
