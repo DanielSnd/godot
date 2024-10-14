@@ -960,6 +960,7 @@ void main() {
 					,
 					shadow_modulate.rgb
 #endif
+				);
 		}
 #endif
 
