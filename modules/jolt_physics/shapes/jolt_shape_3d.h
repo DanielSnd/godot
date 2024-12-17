@@ -109,10 +109,6 @@ public:
 
 #define ERR_PRINT_INVALID_SCALE_MSG(m_scale, m_valid_scale, m_msg)                               \
 	if (unlikely(!JoltShape3D::is_scale_valid(m_scale, valid_scale))) {                          \
-		ERR_PRINT(vformat("%s "                                                                  \
-						  "A scale of %v is not supported by Jolt Physics for this shape/body. " \
-						  "The scale will instead be treated as %v.",                            \
-				m_msg, m_scale, valid_scale));                                                   \
 	} else                                                                                       \
 		((void)0)
 
