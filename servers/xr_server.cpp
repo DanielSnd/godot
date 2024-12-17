@@ -342,6 +342,8 @@ void XRServer::add_tracker(const Ref<XRTracker> &p_tracker) {
 }
 
 void XRServer::remove_tracker(const Ref<XRTracker> &p_tracker) {
+	if (p_tracker.is_null()) 
+		return;
 	ERR_FAIL_COND(p_tracker.is_null());
 
 	StringName tracker_name = p_tracker->get_tracker_name();
