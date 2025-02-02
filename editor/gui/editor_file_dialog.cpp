@@ -481,9 +481,9 @@ void EditorFileDialog::_post_popup() {
 	set_current_dir(current);
 
 	if (mode == FILE_MODE_SAVE_FILE) {
-		file->grab_focus(true);
+		file->grab_focus(PlayerId::P1,true);
 	} else {
-		item_list->grab_focus(true);
+		item_list->grab_focus(PlayerId::P1,true);
 	}
 
 	bool is_open_directory_mode = mode == FILE_MODE_OPEN_DIR;
@@ -2233,7 +2233,7 @@ void EditorFileDialog::set_show_search_filter(bool p_show) {
 		search_string.clear();
 		filter_box->clear();
 		if (filter_box->has_focus()) {
-			item_list->call_deferred("grab_focus");
+			item_list->call_deferred("grab_focus", PlayerId::P1);
 		}
 	}
 	show_search_filter = p_show;
