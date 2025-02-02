@@ -306,7 +306,7 @@ void AnimationBezierTrackEdit::_notification(int p_what) {
 
 			const String &lang = _get_locale();
 
-			if (has_focus(true)) {
+			if (has_focus(PlayerId::P1, true)) {
 				draw_rect(Rect2(Point2(1, 1), get_size() - Point2(1, 1)), focus_color, false, Math::round(EDSCALE));
 			}
 
