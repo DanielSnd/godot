@@ -558,6 +558,24 @@ public:
 	template <typename T>
 	_FORCE_INLINE_ Variant(BitField<T> p_bitfield) :
 			Variant(static_cast<uint64_t>(p_bitfield)) {}
+			
+#define VARIANT_ENUM_CLASS_CONSTRUCTOR(m_enum) \
+	Variant(m_enum p_value) :                  \
+			type(INT) {                        \
+		_data._int = (int64_t)p_value;         \
+	}
+
+	// Only enum classes that need to be bound need this to be defined.
+	VARIANT_ENUM_CLASS_CONSTRUCTOR(EulerOrder)
+	VARIANT_ENUM_CLASS_CONSTRUCTOR(JoyAxis)
+	VARIANT_ENUM_CLASS_CONSTRUCTOR(JoyButton)
+	VARIANT_ENUM_CLASS_CONSTRUCTOR(Key)
+	VARIANT_ENUM_CLASS_CONSTRUCTOR(KeyLocation)
+	VARIANT_ENUM_CLASS_CONSTRUCTOR(MIDIMessage)
+	VARIANT_ENUM_CLASS_CONSTRUCTOR(MouseButton)
+	VARIANT_ENUM_CLASS_CONSTRUCTOR(PlayerId)
+
+#undef VARIANT_ENUM_CLASS_CONSTRUCTOR
 
 	// If this changes the table in variant_op must be updated
 	enum Operator {
