@@ -5684,7 +5684,7 @@ void VisualShaderEditor::_type_selected(int p_id) {
 	_update_nodes();
 	_update_graph();
 
-	graph->grab_focus(true);
+	graph->grab_focus(PlayerId::P1, true);
 }
 
 void VisualShaderEditor::_custom_mode_toggled(bool p_enabled) {

@@ -57,7 +57,7 @@ void LineEdit::_edit(bool p_show_virtual_keyboard, bool p_hide_focus) {
 	}
 
 	if (!has_focus()) {
-		grab_focus(p_hide_focus);
+		grab_focus(PlayerId::P1, p_hide_focus);
 		return;
 	}
 
@@ -1143,10 +1143,10 @@ void LineEdit::drop_data(const Point2 &p_point, const Variant &p_data) {
 			selection_delete();
 			set_caret_column(caret_column_tmp);
 			insert_text_at_caret(p_data);
-			grab_focus(true);
+			grab_focus(PlayerId::P1,true);
 		} else {
 			insert_text_at_caret(p_data);
-			grab_focus(true);
+			grab_focus(PlayerId::P1,true);
 		}
 		select(caret_column_tmp, caret_column);
 		if (!text_changed_dirty) {
@@ -1384,9 +1384,11 @@ void LineEdit::_notification(int p_what) {
 			if (!flat) {
 				style->draw(ci, Rect2(Point2(), size));
 			}
-
-			if (has_focus(Engine::get_singleton()->is_editor_hint() || GLOBAL_GET_CACHED(int, "gui/common/show_focus_state_on_pointer_event") != 1)) {
-				theme_cache.focus->draw(ci, Rect2(Point2(), size));
+			for (int i = 0; i < PLAYERS_MAX; i++) {
+				if (has_focus(((PlayerId)i), Engine::get_singleton()->is_editor_hint() || GLOBAL_GET_CACHED(int, "gui/common/show_focus_state_on_pointer_event") != 1)) {
+					theme_cache.focus->draw(ci, Rect2(Point2(), size));
+					break;
+				}
 			}
 
 			int x_ofs = 0;
