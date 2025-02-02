@@ -215,7 +215,7 @@ void EditorSpinSlider::_grabber_gui_input(const Ref<InputEvent> &p_event) {
 				grabbing_ratio = get_as_ratio();
 				grabbing_from = grabber->get_transform().xform(mb->get_position()).x;
 			}
-			grab_focus(true);
+			grab_focus(PlayerId::P1,true);
 			emit_signal("grabbed");
 		} else {
 			if (grabbing_grabber) {
@@ -289,7 +289,7 @@ void EditorSpinSlider::_value_input_gui_input(const Ref<InputEvent> &p_event) {
 			case Key::ESCAPE: {
 				value_input_closed_frame = Engine::get_singleton()->get_frames_drawn();
 				if (value_input) {
-					value_input_focus_visible = value_input->has_focus(true);
+					value_input_focus_visible = value_input->has_focus(PlayerId::P1,true);
 					value_input->hide();
 				}
 			} break;
@@ -352,7 +352,7 @@ void EditorSpinSlider::_draw_spin_slider() {
 		}
 	}
 
-	if (has_focus(true)) {
+	if (has_focus(PlayerId::P1,true)) {
 		Ref<StyleBox> focus = get_theme_stylebox(SNAME("focus"), SNAME("LineEdit"));
 		draw_style_box(focus, Rect2(Vector2(), size));
 	}
@@ -610,7 +610,7 @@ void EditorSpinSlider::_evaluate_input_text() {
 void EditorSpinSlider::_value_input_submitted(const String &p_text) {
 	value_input_closed_frame = Engine::get_singleton()->get_frames_drawn();
 	if (value_input) {
-		value_input_focus_visible = value_input->has_focus(true);
+		value_input_focus_visible = value_input->has_focus(PlayerId::P1,true);
 		value_input->hide();
 	}
 }
@@ -643,7 +643,7 @@ void EditorSpinSlider::_value_focus_exited() {
 		}
 	} else {
 		// Enter or Esc was pressed. Keep showing the focus if already present.
-		grab_focus(!value_input_focus_visible);
+		grab_focus(PlayerId::P1, !value_input_focus_visible);
 	}
 	value_input_focus_visible = false;
 
@@ -696,7 +696,7 @@ void EditorSpinSlider::_focus_entered(bool p_hide_focus) {
 	value_input->set_focus_next(find_next_valid_focus()->get_path());
 	value_input->set_focus_previous(find_prev_valid_focus()->get_path());
 	callable_mp((CanvasItem *)value_input, &CanvasItem::show).call_deferred();
-	callable_mp((Control *)value_input, &Control::grab_focus).call_deferred(p_hide_focus);
+	callable_mp((Control *)value_input, &Control::grab_focus).call_deferred(PlayerId::P1,p_hide_focus);
 	callable_mp(value_input, &LineEdit ::select_all).call_deferred();
 	emit_signal("value_focus_entered");
 }

@@ -445,7 +445,7 @@ void EditorPropertyTextEnum::_option_selected(int p_which) {
 void EditorPropertyTextEnum::_edit_custom_value() {
 	default_layout->hide();
 	edit_custom_layout->show();
-	custom_value_edit->grab_focus(true);
+	custom_value_edit->grab_focus(PlayerId::P1, true);
 }
 
 void EditorPropertyTextEnum::_custom_value_submitted(const String &p_value) {
@@ -1442,6 +1442,12 @@ void EditorPropertyLayers::setup(LayerType p_layer_type) {
 			basename = "layer_names/avoidance";
 			layer_group_size = 4;
 			layer_count = 32;
+		} break;
+
+		case LAYER_PLAYER_MASK: {
+			basename = "layer_names/player_mask";
+			layer_group_size = 4;
+			layer_count = 8;
 		} break;
 	}
 
@@ -3053,7 +3059,7 @@ void EditorPropertyNodePath::_menu_option(int p_idx) {
 			const NodePath &np = _get_node_path();
 			edit->set_text(String(np));
 			edit->show();
-			callable_mp((Control *)edit, &Control::grab_focus).call_deferred(false);
+			callable_mp((Control *)edit, &Control::grab_focus).call_deferred(PlayerId::P1,false);
 		} break;
 
 		case ACTION_SELECT: {
@@ -3828,7 +3834,8 @@ EditorProperty *EditorInspectorDefaultPlugin::get_editor_for_property(Object *p_
 					p_hint == PROPERTY_HINT_LAYERS_3D_PHYSICS ||
 					p_hint == PROPERTY_HINT_LAYERS_3D_RENDER ||
 					p_hint == PROPERTY_HINT_LAYERS_3D_NAVIGATION ||
-					p_hint == PROPERTY_HINT_LAYERS_AVOIDANCE) {
+					p_hint == PROPERTY_HINT_LAYERS_AVOIDANCE ||
+					p_hint == PROPERTY_HINT_LAYERS_PLAYER_MASK) {
 				EditorPropertyLayers::LayerType lt = EditorPropertyLayers::LAYER_RENDER_2D;
 				switch (p_hint) {
 					case PROPERTY_HINT_LAYERS_2D_RENDER:
@@ -3851,6 +3858,9 @@ EditorProperty *EditorInspectorDefaultPlugin::get_editor_for_property(Object *p_
 						break;
 					case PROPERTY_HINT_LAYERS_AVOIDANCE:
 						lt = EditorPropertyLayers::LAYER_AVOIDANCE;
+						break;
+					case PROPERTY_HINT_LAYERS_PLAYER_MASK:
+						lt = EditorPropertyLayers::LAYER_PLAYER_MASK;
 						break;
 					default: {
 					} //compiler could be smarter here and realize this can't happen

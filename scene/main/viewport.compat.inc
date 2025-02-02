@@ -1,5 +1,5 @@
 /**************************************************************************/
-/*  control.compat.inc                                                    */
+/*  viewport.compat.inc                                                   */
 /**************************************************************************/
 /*                         This file is part of:                          */
 /*                             GODOT ENGINE                               */
@@ -30,37 +30,27 @@
 
 #ifndef DISABLE_DEPRECATED
 
-bool Control::_has_focus_bind_compat_102412() const {
-	return has_focus(PlayerId::P1);
+void Viewport::_gui_remove_focus_for_window_bind_compat_102412(Node *p_window) {
+	_gui_remove_focus_for_window(p_window, PlayerId::P1);
 }
 
-void Control::_grab_focus_bind_compat_102412() {
-	grab_focus(PlayerId::P1);
+void Viewport::_push_text_input_bind_compat_102412(const String &p_text) {
+	push_text_input(p_text, PlayerId::P1);
 }
 
-void Control::_release_focus_bind_compat_102412() {
-	release_focus(PlayerId::P1);
+void Viewport::_gui_release_focus_bind_compat_102412() {
+	gui_release_focus(PlayerId::P1);
 }
 
-Control *Control::_find_next_valid_focus_bind_compat_102412() const {
-	return find_next_valid_focus(PlayerId::P1);
+Control *Viewport::_gui_get_focus_owner_bind_compat_102412() const {
+	return gui_get_focus_owner(PlayerId::P1);
 }
 
-Control *Control::_find_prev_valid_focus_bind_compat_102412() const {
-	return find_prev_valid_focus(PlayerId::P1);
-}
-
-Control *Control::_find_valid_focus_neighbor_bind_compat_102412(Side p_size) const {
-	return find_valid_focus_neighbor(p_size, PlayerId::P1);
-}
-
-void Control::_bind_compatibility_methods() {
-	ClassDB::bind_compatibility_method(D_METHOD("has_focus"), &Control::_has_focus_bind_compat_102412);
-	ClassDB::bind_compatibility_method(D_METHOD("grab_focus"), &Control::_grab_focus_bind_compat_102412);
-	ClassDB::bind_compatibility_method(D_METHOD("release_focus"), &Control::_release_focus_bind_compat_102412);
-	ClassDB::bind_compatibility_method(D_METHOD("find_next_valid_focus"), &Control::_find_next_valid_focus_bind_compat_102412);
-	ClassDB::bind_compatibility_method(D_METHOD("find_prev_valid_focus"), &Control::_find_prev_valid_focus_bind_compat_102412);
-	ClassDB::bind_compatibility_method(D_METHOD("find_valid_focus_neighbor", "side"), &Control::_find_valid_focus_neighbor_bind_compat_102412);
+void Viewport::_bind_compatibility_methods() {
+	ClassDB::bind_compatibility_method(D_METHOD("_gui_remove_focus_for_window"), &Viewport::_gui_remove_focus_for_window_bind_compat_102412);
+	ClassDB::bind_compatibility_method(D_METHOD("push_text_input", "text"), &Viewport::_push_text_input_bind_compat_102412);
+	ClassDB::bind_compatibility_method(D_METHOD("gui_release_focus"), &Viewport::_gui_release_focus_bind_compat_102412);
+	ClassDB::bind_compatibility_method(D_METHOD("gui_get_focus_owner"), &Viewport::_gui_get_focus_owner_bind_compat_102412);
 }
 
 #endif // DISABLE_DEPRECATED

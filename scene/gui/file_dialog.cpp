@@ -413,9 +413,9 @@ void FileDialog::_save_confirm_pressed() {
 void FileDialog::_post_popup() {
 	ConfirmationDialog::_post_popup();
 	if (mode == FILE_MODE_SAVE_FILE) {
-		filename_edit->grab_focus(true);
+		filename_edit->grab_focus(PlayerId::P1,true);
 	} else {
-		file_list->grab_focus(true);
+		file_list->grab_focus(PlayerId::P1,true);
 	}
 
 	// For open dir mode, deselect all items on file dialog open.
@@ -2225,7 +2225,7 @@ void FileDialog::set_show_filename_filter(bool p_show) {
 		filename_filter->grab_focus();
 	} else {
 		if (filename_filter->has_focus()) {
-			callable_mp((Control *)file_list, &Control::grab_focus).call_deferred(false);
+			callable_mp((Control *)file_list, &Control::grab_focus).call_deferred(PlayerId::P1,false);
 		}
 	}
 	show_filename_filter = p_show;
