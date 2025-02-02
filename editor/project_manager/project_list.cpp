@@ -1022,7 +1022,7 @@ int ProjectList::get_index(const ProjectListItemControl *p_control) const {
 void ProjectList::ensure_project_visible(int p_index) {
 	const Item &item = _projects[p_index];
 	// Since follow focus is enabled.
-	item.control->grab_focus(true);
+	item.control->grab_focus(PlayerId::P1, true);
 }
 
 void ProjectList::_create_project_item_control(int p_index) {

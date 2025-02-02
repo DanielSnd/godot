@@ -386,7 +386,7 @@ void TileMapLayerEditorTilesPlugin::_update_patterns_list() {
 	// Added a new pattern, thus select the last one.
 	if (select_last_pattern) {
 		patterns_item_list->select(tile_set->get_patterns_count() - 1);
-		patterns_item_list->grab_focus(true);
+		patterns_item_list->grab_focus(PlayerId::P1, true);
 		_update_selection_pattern_from_tileset_pattern_selection();
 	}
 	select_last_pattern = false;

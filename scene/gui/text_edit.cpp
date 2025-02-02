@@ -945,8 +945,12 @@ void TextEdit::_notification(int p_what) {
 			if (!editable) {
 				draw_caret = is_drawing_caret_when_editable_disabled();
 			}
-			if (has_focus(Engine::get_singleton()->is_editor_hint() || GLOBAL_GET_CACHED(int, "gui/common/show_focus_state_on_pointer_event") != 1)) {
-				theme_cache.style_focus->draw(ci, Rect2(Point2(), size));
+
+			for (int i = 0; i < PLAYERS_MAX; i++) {
+				if (has_focus(((PlayerId)i), Engine::get_singleton()->is_editor_hint() || GLOBAL_GET_CACHED(int, "gui/common/show_focus_state_on_pointer_event") != 1)) {
+					theme_cache.style_focus->draw(ci, Rect2(Point2(), size));
+					break;
+				}
 			}
 
 			int visible_rows = get_visible_line_count() + 1;

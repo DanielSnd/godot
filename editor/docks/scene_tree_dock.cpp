@@ -610,7 +610,7 @@ void SceneTreeDock::_tool_selected(int p_tool, bool p_confirm_override) {
 				if (!_validate_no_foreign()) {
 					break;
 				}
-				tree->grab_focus(!tree->has_focus(true));
+				tree->grab_focus(PlayerId::P1, !tree->has_focus(PlayerId::P1, true));
 				tree->edit_selected();
 			}
 		} break;
@@ -1589,7 +1589,7 @@ void SceneTreeDock::_tool_selected(int p_tool, bool p_confirm_override) {
 			editor_selection->clear();
 			editor_selection->add_node(new_node);
 
-			scene_tree->get_scene_tree()->grab_focus(true);
+			scene_tree->get_scene_tree()->grab_focus(PlayerId::P1,true);
 		} break;
 
 		default: {
@@ -3188,7 +3188,7 @@ void SceneTreeDock::_create() {
 		undo_redo->commit_action();
 	}
 
-	scene_tree->get_scene_tree()->grab_focus(true);
+	scene_tree->get_scene_tree()->grab_focus(PlayerId::P1,true);
 }
 
 void SceneTreeDock::replace_node(Node *p_node, Node *p_by_node) {
@@ -3836,7 +3836,7 @@ void SceneTreeDock::_tree_rmb(const Vector2 &p_menu_pos) {
 	const List<Node *> selection = editor_selection->get_top_selected_node_list();
 	List<Node *> full_selection = editor_selection->get_full_selected_node_list(); // Above method only returns nodes with common parent.
 
-	scene_tree->get_scene_tree()->grab_focus(true);
+	scene_tree->get_scene_tree()->grab_focus(PlayerId::P1, true);
 
 	if (selection.is_empty()) {
 		if (!profile_allow_editing) {
