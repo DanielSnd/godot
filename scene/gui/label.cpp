@@ -769,7 +769,7 @@ void Label::_notification(int p_what) {
 			Vector<LabelSettings::StackedShadowData> stacked_shadow_datas = has_settings ? settings->get_stacked_shadow_data() : Vector<LabelSettings::StackedShadowData>();
 			bool rtl_layout = is_layout_rtl();
 
-			if (has_focus(true)) {
+			if (has_focus(PlayerId::P1,true)) {
 				theme_cache.focus_style->draw(ci, Rect2(Point2(0, 0), get_size()));
 			} else {
 				theme_cache.normal_style->draw(ci, Rect2(Point2(0, 0), get_size()));

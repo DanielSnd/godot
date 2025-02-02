@@ -882,6 +882,7 @@ void Window::update_mouse_cursor_state() {
 	mm->set_position(pos);
 	mm->set_global_position(xform.xform(pos));
 	mm->set_device(InputEvent::DEVICE_ID_INTERNAL);
+	mm->set_player_from_device();
 	push_input(mm, true);
 }
 
@@ -1872,7 +1873,7 @@ void Window::_window_input(const Ref<InputEvent> &p_ev) {
 }
 
 void Window::_window_input_text(const String &p_text, bool p_emit_signal) {
-	_push_text_input(p_text, p_emit_signal);
+	_push_text_input(p_text, PlayerId::P1, p_emit_signal);
 }
 
 void Window::_window_drop_files(const Vector<String> &p_files) {

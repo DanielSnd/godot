@@ -277,7 +277,7 @@ void SpinBox::gui_input(const Ref<InputEvent> &p_event) {
 		switch (mb->get_button_index()) {
 			case MouseButton::LEFT: {
 				accepted = true;
-				line_edit->grab_focus(true);
+				line_edit->grab_focus(PlayerId::P1,true);
 
 				if (mouse_on_up_button || mouse_on_down_button) {
 					_arrow_clicked(mouse_on_up_button);
@@ -294,7 +294,7 @@ void SpinBox::gui_input(const Ref<InputEvent> &p_event) {
 				drag.capture_pos = mb->get_position();
 			} break;
 			case MouseButton::RIGHT: {
-				line_edit->grab_focus(true);
+				line_edit->grab_focus(PlayerId::P1,true);
 				if (mouse_on_up_button || mouse_on_down_button) {
 					set_value(mouse_on_up_button ? get_max() : get_min());
 				}

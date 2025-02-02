@@ -1,5 +1,5 @@
 /**************************************************************************/
-/*  control.compat.inc                                                    */
+/*  input_event.compat.inc                                                */
 /**************************************************************************/
 /*                         This file is part of:                          */
 /*                             GODOT ENGINE                               */
@@ -30,37 +30,22 @@
 
 #ifndef DISABLE_DEPRECATED
 
-bool Control::_has_focus_bind_compat_102412() const {
-	return has_focus(PlayerId::P1);
+bool InputEvent::_is_action_pressed_bind_compat_102412(const StringName &p_action, bool p_allow_echo, bool p_exact_match) const {
+	return is_action_pressed(p_action, p_allow_echo, p_exact_match, PlayerId::P1);
 }
 
-void Control::_grab_focus_bind_compat_102412() {
-	grab_focus(PlayerId::P1);
+bool InputEvent::_is_action_released_bind_compat_102412(const StringName &p_action, bool p_exact_match) const {
+	return is_action_released(p_action, p_exact_match, PlayerId::P1);
 }
 
-void Control::_release_focus_bind_compat_102412() {
-	release_focus(PlayerId::P1);
+float InputEvent::_get_action_strength_bind_compat_102412(const StringName &p_action, bool p_exact_match) const {
+	return get_action_strength(p_action, p_exact_match, PlayerId::P1);
 }
 
-Control *Control::_find_next_valid_focus_bind_compat_102412() const {
-	return find_next_valid_focus(PlayerId::P1);
-}
-
-Control *Control::_find_prev_valid_focus_bind_compat_102412() const {
-	return find_prev_valid_focus(PlayerId::P1);
-}
-
-Control *Control::_find_valid_focus_neighbor_bind_compat_102412(Side p_size) const {
-	return find_valid_focus_neighbor(p_size, PlayerId::P1);
-}
-
-void Control::_bind_compatibility_methods() {
-	ClassDB::bind_compatibility_method(D_METHOD("has_focus"), &Control::_has_focus_bind_compat_102412);
-	ClassDB::bind_compatibility_method(D_METHOD("grab_focus"), &Control::_grab_focus_bind_compat_102412);
-	ClassDB::bind_compatibility_method(D_METHOD("release_focus"), &Control::_release_focus_bind_compat_102412);
-	ClassDB::bind_compatibility_method(D_METHOD("find_next_valid_focus"), &Control::_find_next_valid_focus_bind_compat_102412);
-	ClassDB::bind_compatibility_method(D_METHOD("find_prev_valid_focus"), &Control::_find_prev_valid_focus_bind_compat_102412);
-	ClassDB::bind_compatibility_method(D_METHOD("find_valid_focus_neighbor", "side"), &Control::_find_valid_focus_neighbor_bind_compat_102412);
+void InputEvent::_bind_compatibility_methods() {
+	ClassDB::bind_compatibility_method(D_METHOD("is_action_pressed", "action", "allow_echo", "exact_match"), &InputEvent::_is_action_pressed_bind_compat_102412, DEFVAL(false), DEFVAL(false));
+	ClassDB::bind_compatibility_method(D_METHOD("is_action_released", "action", "exact_match"), &InputEvent::_is_action_released_bind_compat_102412, DEFVAL(false));
+	ClassDB::bind_compatibility_method(D_METHOD("get_action_strength", "action", "exact_match"), &InputEvent::_get_action_strength_bind_compat_102412, DEFVAL(false));
 }
 
 #endif // DISABLE_DEPRECATED
