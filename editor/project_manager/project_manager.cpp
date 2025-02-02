@@ -371,7 +371,7 @@ void ProjectManager::_select_main_view(int p_id) {
 		// Automatically grab focus when the user moves from the Templates tab
 		// back to the Projects tab.
 		// Needs to be deferred, otherwise the focus outline is always drawn.
-		callable_mp((Control *)search_box, &Control::grab_focus).call_deferred(true);
+		callable_mp((Control *)search_box, &Control::grab_focus).call_deferred(PlayerId::P1, true);
 	}
 
 	// The Templates tab's search field is focused on display in the asset
@@ -1910,7 +1910,7 @@ ProjectManager::ProjectManager() {
 		new_tag_name->connect(SceneStringName(text_changed), callable_mp(this, &ProjectManager::_set_new_tag_name));
 		new_tag_name->connect(SceneStringName(text_submitted), callable_mp(this, &ProjectManager::_create_new_tag).unbind(1));
 		create_tag_dialog->connect("about_to_popup", callable_mp(new_tag_name, &LineEdit::clear));
-		create_tag_dialog->connect("about_to_popup", callable_mp((Control *)new_tag_name, &Control::grab_focus).bind(false), CONNECT_DEFERRED);
+		create_tag_dialog->connect("about_to_popup", callable_mp((Control *)new_tag_name, &Control::grab_focus).bind(PlayerId::P1, false), CONNECT_DEFERRED);
 
 		tag_error = memnew(Label);
 		tag_error->set_focus_mode(FOCUS_ACCESSIBILITY);

@@ -470,16 +470,16 @@ void FindInFilesDialog::set_search_text(const String &text) {
 			_search_text_line_edit->set_text(text);
 			_on_search_text_modified(text);
 		}
-		callable_mp((Control *)_search_text_line_edit, &Control::grab_focus).call_deferred(false);
+		callable_mp((Control *)_search_text_line_edit, &Control::grab_focus).call_deferred(PlayerId::P1,false);
 		_search_text_line_edit->select_all();
 	} else if (_mode == REPLACE_MODE) {
 		if (!text.is_empty()) {
 			_search_text_line_edit->set_text(text);
-			callable_mp((Control *)_replace_text_line_edit, &Control::grab_focus).call_deferred(false);
+			callable_mp((Control *)_replace_text_line_edit, &Control::grab_focus).call_deferred(PlayerId::P1,false);
 			_replace_text_line_edit->select_all();
 			_on_search_text_modified(text);
 		} else {
-			callable_mp((Control *)_search_text_line_edit, &Control::grab_focus).call_deferred(false);
+			callable_mp((Control *)_search_text_line_edit, &Control::grab_focus).call_deferred(PlayerId::P1,false);
 			_search_text_line_edit->select_all();
 		}
 	}

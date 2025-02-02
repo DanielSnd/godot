@@ -500,7 +500,7 @@ void MenuBar::_draw_menu_item(int p_index) {
 			style->draw(ci, item_rect);
 		}
 		// Focus colors only take precedence over normal state.
-		if (has_focus(true)) {
+		if (has_focus(PlayerId::P1,true)) {
 			color = theme_cache.font_focus_color;
 		} else {
 			color = theme_cache.font_color;

@@ -2655,7 +2655,7 @@ void RichTextLabel::_notification(int p_what) {
 
 			draw_style_box(theme_cache.normal_style, Rect2(Point2(), size));
 
-			if (has_focus(true)) {
+			if (has_focus(PlayerId::P1,true)) {
 				RenderingServer::get_singleton()->canvas_item_add_clip_ignore(ci, true);
 				draw_style_box(theme_cache.focus_style, Rect2(Point2(), size));
 				RenderingServer::get_singleton()->canvas_item_add_clip_ignore(ci, false);
