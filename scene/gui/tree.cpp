@@ -2388,13 +2388,13 @@ int Tree::draw_item(const Point2i &p_pos, const Point2 &p_draw_ofs, const Size2 
 
 					if (p_item->cells[0].selected) {
 						if (is_row_hovered) {
-							if (has_focus(true)) {
+							if (has_focus(PlayerId::P1,true)) {
 								theme_cache.hovered_selected_focus->draw(ci, row_rect);
 							} else {
 								theme_cache.hovered_selected->draw(ci, row_rect);
 							}
 						} else {
-							if (has_focus(true)) {
+							if (has_focus(PlayerId::P1,true)) {
 								theme_cache.selected_focus->draw(ci, row_rect);
 							} else {
 								theme_cache.selected->draw(ci, row_rect);
@@ -2431,13 +2431,13 @@ int Tree::draw_item(const Point2i &p_pos, const Point2 &p_draw_ofs, const Size2 
 					r = convert_rtl_rect(r);
 					if (p_item->cells[i].selected) {
 						if (is_cell_hovered) {
-							if (has_focus(true)) {
+							if (has_focus(PlayerId::P1,true)) {
 								theme_cache.hovered_selected_focus->draw(ci, r);
 							} else {
 								theme_cache.hovered_selected->draw(ci, r);
 							}
 						} else {
-							if (has_focus(true)) {
+							if (has_focus(PlayerId::P1,true)) {
 								theme_cache.selected_focus->draw(ci, r);
 							} else {
 								theme_cache.selected->draw(ci, r);
@@ -2722,7 +2722,7 @@ int Tree::draw_item(const Point2i &p_pos, const Point2 &p_draw_ofs, const Size2 
 
 			if (select_mode == SELECT_MULTI && selected_item == p_item && selected_col == i) {
 				cell_rect = convert_rtl_rect(cell_rect);
-				if (has_focus(true)) {
+				if (has_focus(PlayerId::P1,true)) {
 					theme_cache.cursor->draw(ci, cell_rect);
 				} else {
 					theme_cache.cursor_unfocus->draw(ci, cell_rect);
@@ -3420,7 +3420,7 @@ void Tree::_text_editor_gui_input(const Ref<InputEvent> &p_event) {
 	if (p_event->is_action_pressed("ui_text_newline_blank", true)) {
 		accept_event();
 	} else if (p_event->is_action_pressed("ui_text_newline")) {
-		bool hide_focus = !text_editor->has_focus(true);
+		bool hide_focus = !text_editor->has_focus(PlayerId::P1,true);
 		popup_edit_committed = true; // End edit popup processing.
 		popup_editor->hide();
 		_apply_multiline_edit(hide_focus);
@@ -3447,7 +3447,7 @@ void Tree::_apply_multiline_edit(bool p_hide_focus) {
 		}
 	}
 
-	grab_focus(p_hide_focus);
+	grab_focus(PlayerId::P1,p_hide_focus);
 	item_edited(popup_edited_item_col, popup_edited_item);
 	queue_redraw();
 }
@@ -3461,7 +3461,7 @@ void Tree::_line_editor_submit(String p_text) {
 		return; // ESC pressed, app focus lost, or forced close from code.
 	}
 
-	bool hide_focus = !line_editor->has_focus(true);
+	bool hide_focus = !line_editor->has_focus(PlayerId::P1,true);
 
 	popup_edit_committed = true; // End edit popup processing.
 	popup_editor->hide();
@@ -3495,7 +3495,7 @@ void Tree::_line_editor_submit(String p_text) {
 		}
 	}
 
-	grab_focus(hide_focus);
+	grab_focus(PlayerId::P1, hide_focus);
 	item_edited(popup_edited_item_col, popup_edited_item);
 	queue_redraw();
 }
@@ -4466,7 +4466,7 @@ bool Tree::edit_selected(bool p_force_edit) {
 		}
 		popup_rect.position += get_screen_position();
 
-		bool hide_focus = !has_focus(true);
+		bool hide_focus = !has_focus(PlayerId::P1,true);
 
 		line_editor->clear();
 		line_editor->set_text(c.mode == TreeItem::CELL_MODE_STRING ? c.text : String::num(c.val, Math::range_step_decimals(c.step)));
@@ -4484,11 +4484,11 @@ bool Tree::edit_selected(bool p_force_edit) {
 		popup_editor->popup();
 		popup_editor->child_controls_changed();
 
-		line_editor->grab_focus(hide_focus);
+		line_editor->grab_focus(PlayerId::P1, hide_focus);
 
 		return true;
 	} else if (c.mode == TreeItem::CELL_MODE_STRING && c.edit_multiline) {
-		bool hide_focus = !has_focus(true);
+		bool hide_focus = !has_focus(PlayerId::P1,true);
 
 		line_editor->hide();
 
@@ -4506,7 +4506,7 @@ bool Tree::edit_selected(bool p_force_edit) {
 		popup_editor->popup();
 		popup_editor->child_controls_changed();
 
-		text_editor->grab_focus(hide_focus);
+		text_editor->grab_focus(PlayerId::P1, hide_focus);
 
 		return true;
 	}
@@ -5201,7 +5201,7 @@ void Tree::_notification(int p_what) {
 
 			// Draw the focus outline last, so that it is drawn in front of the section headings.
 			// Otherwise, section heading backgrounds can appear to be in front of the focus outline when scrolling.
-			if (has_focus(true)) {
+			if (has_focus(PlayerId::P1,true)) {
 				RenderingServer::get_singleton()->canvas_item_add_clip_ignore(ci, true);
 				theme_cache.focus_style->draw(ci, Rect2(Point2(), get_size()));
 				RenderingServer::get_singleton()->canvas_item_add_clip_ignore(ci, false);
