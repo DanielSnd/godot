@@ -1489,6 +1489,13 @@ void main() {
 
 		float shadowmask = 1.0;
 
+		// add same boolean variables as before
+		#ifdef LIGHT_SOURCE_INFO
+		// let's set a boolean variable using the way we previously discussed
+		bool _light_has_direction = true;
+		bool _light_has_range = false;
+		#endif
+		
 #ifdef USE_LIGHTMAP
 		uint shadowmask_mode = LIGHTMAP_SHADOWMASK_MODE_NONE;
 
@@ -1720,6 +1727,12 @@ void main() {
 #endif // LIGHT_CLEARCOAT_USED
 #ifdef LIGHT_ANISOTROPY_USED
 					binormal, tangent, anisotropy,
+#endif
+#ifdef LIGHT_SOURCE_INFO
+			_light_has_direction, _light_has_range,
+#endif
+#ifdef LIGHT_INDEX_USED
+			i,
 #endif
 					diffuse_light,
 					specular_light);

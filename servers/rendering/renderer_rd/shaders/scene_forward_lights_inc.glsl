@@ -52,6 +52,414 @@ vec3 F0(float metallic, float specular, vec3 albedo) {
 	return mix(vec3(dielectric), albedo, vec3(metallic));
 }
 
+#ifndef SHADOWS_DISABLED
+
+// Interleaved Gradient Noise
+// https://www.iryoku.com/next-generation-post-processing-in-call-of-duty-advanced-warfare
+float quick_hash(vec2 pos) {
+	const vec3 magic = vec3(0.06711056f, 0.00583715f, 52.9829189f);
+	return fract(magic.z * fract(dot(pos, magic.xy)));
+}
+
+float sample_directional_pcf_shadow(texture2D shadow, vec2 shadow_pixel_size, vec4 coord, float taa_frame_count) {
+	vec2 pos = coord.xy;
+	float depth = coord.z;
+
+	//if only one sample is taken, take it from the center
+	if (sc_directional_soft_shadow_samples() == 0) {
+		return textureProj(sampler2DShadow(shadow, shadow_sampler), vec4(pos, depth, 1.0));
+	}
+
+	mat2 disk_rotation;
+	{
+		float r = quick_hash(gl_FragCoord.xy + vec2(taa_frame_count * 5.588238)) * 2.0 * M_PI;
+		float sr = sin(r);
+		float cr = cos(r);
+		disk_rotation = mat2(vec2(cr, -sr), vec2(sr, cr));
+	}
+
+	float avg = 0.0;
+
+	SPEC_CONSTANT_LOOP_ANNOTATION
+	for (uint i = 0; i < sc_directional_soft_shadow_samples(); i++) {
+		avg += textureProj(sampler2DShadow(shadow, shadow_sampler), vec4(pos + shadow_pixel_size * (disk_rotation * scene_data_block.data.directional_soft_shadow_kernel[i].xy), depth, 1.0));
+	}
+
+	return avg * (1.0 / float(sc_directional_soft_shadow_samples()));
+}
+
+float sample_pcf_shadow(texture2D shadow, vec2 shadow_pixel_size, vec3 coord, float taa_frame_count) {
+	vec2 pos = coord.xy;
+	float depth = coord.z;
+
+	//if only one sample is taken, take it from the center
+	if (sc_soft_shadow_samples() == 0) {
+		return textureProj(sampler2DShadow(shadow, shadow_sampler), vec4(pos, depth, 1.0));
+	}
+
+	mat2 disk_rotation;
+	{
+		float r = quick_hash(gl_FragCoord.xy + vec2(taa_frame_count * 5.588238)) * 2.0 * M_PI;
+		float sr = sin(r);
+		float cr = cos(r);
+		disk_rotation = mat2(vec2(cr, -sr), vec2(sr, cr));
+	}
+
+	float avg = 0.0;
+
+	SPEC_CONSTANT_LOOP_ANNOTATION
+	for (uint i = 0; i < sc_soft_shadow_samples(); i++) {
+		avg += textureProj(sampler2DShadow(shadow, shadow_sampler), vec4(pos + shadow_pixel_size * (disk_rotation * scene_data_block.data.soft_shadow_kernel[i].xy), depth, 1.0));
+	}
+
+	return avg * (1.0 / float(sc_soft_shadow_samples()));
+}
+
+float sample_omni_pcf_shadow(texture2D shadow, float blur_scale, vec2 coord, vec4 uv_rect, vec2 flip_offset, float depth, float taa_frame_count) {
+	//if only one sample is taken, take it from the center
+	if (sc_soft_shadow_samples() == 0) {
+		vec2 pos = coord * 0.5 + 0.5;
+		pos = uv_rect.xy + pos * uv_rect.zw;
+		return textureProj(sampler2DShadow(shadow, shadow_sampler), vec4(pos, depth, 1.0));
+	}
+
+	mat2 disk_rotation;
+	{
+		float r = quick_hash(gl_FragCoord.xy + vec2(taa_frame_count * 5.588238)) * 2.0 * M_PI;
+		float sr = sin(r);
+		float cr = cos(r);
+		disk_rotation = mat2(vec2(cr, -sr), vec2(sr, cr));
+	}
+
+	float avg = 0.0;
+	vec2 offset_scale = blur_scale * 2.0 * scene_data_block.data.shadow_atlas_pixel_size / uv_rect.zw;
+
+	SPEC_CONSTANT_LOOP_ANNOTATION
+	for (uint i = 0; i < sc_soft_shadow_samples(); i++) {
+		vec2 offset = offset_scale * (disk_rotation * scene_data_block.data.soft_shadow_kernel[i].xy);
+		vec2 sample_coord = coord + offset;
+
+		float sample_coord_length_squared = dot(sample_coord, sample_coord);
+		bool do_flip = sample_coord_length_squared > 1.0;
+
+		if (do_flip) {
+			float len = sqrt(sample_coord_length_squared);
+			sample_coord = sample_coord * (2.0 / len - 1.0);
+		}
+
+		sample_coord = sample_coord * 0.5 + 0.5;
+		sample_coord = uv_rect.xy + sample_coord * uv_rect.zw;
+
+		if (do_flip) {
+			sample_coord += flip_offset;
+		}
+		avg += textureProj(sampler2DShadow(shadow, shadow_sampler), vec4(sample_coord, depth, 1.0));
+	}
+
+	return avg * (1.0 / float(sc_soft_shadow_samples()));
+}
+
+float sample_directional_soft_shadow(texture2D shadow, vec3 pssm_coord, vec2 tex_scale, float taa_frame_count) {
+	//find blocker
+	float blocker_count = 0.0;
+	float blocker_average = 0.0;
+
+	mat2 disk_rotation;
+	{
+		float r = quick_hash(gl_FragCoord.xy + vec2(taa_frame_count * 5.588238)) * 2.0 * M_PI;
+		float sr = sin(r);
+		float cr = cos(r);
+		disk_rotation = mat2(vec2(cr, -sr), vec2(sr, cr));
+	}
+
+	SPEC_CONSTANT_LOOP_ANNOTATION
+	for (uint i = 0; i < sc_directional_penumbra_shadow_samples(); i++) {
+		vec2 suv = pssm_coord.xy + (disk_rotation * scene_data_block.data.directional_penumbra_shadow_kernel[i].xy) * tex_scale;
+		float d = textureLod(sampler2D(shadow, SAMPLER_LINEAR_CLAMP), suv, 0.0).r;
+		if (d > pssm_coord.z) {
+			blocker_average += d;
+			blocker_count += 1.0;
+		}
+	}
+
+	if (blocker_count > 0.0) {
+		//blockers found, do soft shadow
+		blocker_average /= blocker_count;
+		float penumbra = (-pssm_coord.z + blocker_average) / (1.0 - blocker_average);
+		tex_scale *= penumbra;
+
+		float s = 0.0;
+
+		SPEC_CONSTANT_LOOP_ANNOTATION
+		for (uint i = 0; i < sc_directional_penumbra_shadow_samples(); i++) {
+			vec2 suv = pssm_coord.xy + (disk_rotation * scene_data_block.data.directional_penumbra_shadow_kernel[i].xy) * tex_scale;
+			s += textureProj(sampler2DShadow(shadow, shadow_sampler), vec4(suv, pssm_coord.z, 1.0));
+		}
+
+		return s / float(sc_directional_penumbra_shadow_samples());
+
+	} else {
+		//no blockers found, so no shadow
+		return 1.0;
+	}
+}
+
+#endif // SHADOWS_DISABLED
+
+
+// GREVIN
+// ERROR: 0:1078: 'sc_use_directional_soft_shadows' : undeclared identifier
+// ERROR: 0:1078: '' : missing #endif
+// ERROR: 0:1078: '' : compilation terminated
+// ERROR: 3 compilation errors.  No code generated.
+
+void light_process_directional_shadow(uint i, vec3 vertex, highp vec2 directional_shadow_pixel_size, inout uint shadow0, inout uint shadow1) {
+#ifndef SHADOWS_DISABLED
+	float shadow = 1.0;
+
+	if (directional_lights.data[i].shadow_opacity > 0.001) {
+		float depth_z = -vertex.z;
+		vec3 light_dir = directional_lights.data[i].direction;
+		vec3 base_normal_bias = normalize(normal_interp) * (1.0 - max(0.0, dot(light_dir, -normalize(normal_interp))));
+
+#define BIAS_FUNC(m_var, m_idx)                                                                 \
+	m_var.xyz += light_dir * directional_lights.data[i].shadow_bias[m_idx];                     \
+	vec3 normal_bias = base_normal_bias * directional_lights.data[i].shadow_normal_bias[m_idx]; \
+	normal_bias -= light_dir * dot(light_dir, normal_bias);                                     \
+	m_var.xyz += normal_bias;
+
+		vec4 pssm_coord;
+		float blur_factor;
+
+		if (depth_z < directional_lights.data[i].shadow_split_offsets.x) {
+			vec4 v = vec4(vertex, 1.0);
+
+			BIAS_FUNC(v, 0)
+
+			pssm_coord = (directional_lights.data[i].shadow_matrix1 * v);
+			blur_factor = 1.0;
+		} else if (depth_z < directional_lights.data[i].shadow_split_offsets.y) {
+			vec4 v = vec4(vertex, 1.0);
+
+			BIAS_FUNC(v, 1)
+
+			pssm_coord = (directional_lights.data[i].shadow_matrix2 * v);
+			// Adjust shadow blur with reference to the first split to reduce discrepancy between shadow splits.
+			blur_factor = directional_lights.data[i].shadow_split_offsets.x / directional_lights.data[i].shadow_split_offsets.y;
+		} else if (depth_z < directional_lights.data[i].shadow_split_offsets.z) {
+			vec4 v = vec4(vertex, 1.0);
+
+			BIAS_FUNC(v, 2)
+
+			pssm_coord = (directional_lights.data[i].shadow_matrix3 * v);
+			// Adjust shadow blur with reference to the first split to reduce discrepancy between shadow splits.
+			blur_factor = directional_lights.data[i].shadow_split_offsets.x / directional_lights.data[i].shadow_split_offsets.z;
+		} else {
+			vec4 v = vec4(vertex, 1.0);
+
+			BIAS_FUNC(v, 3)
+
+			pssm_coord = (directional_lights.data[i].shadow_matrix4 * v);
+			// Adjust shadow blur with reference to the first split to reduce discrepancy between shadow splits.
+			blur_factor = directional_lights.data[i].shadow_split_offsets.x / directional_lights.data[i].shadow_split_offsets.w;
+		}
+
+		pssm_coord /= pssm_coord.w;
+
+		shadow = sample_directional_pcf_shadow(directional_shadow_atlas, directional_shadow_pixel_size * directional_lights.data[i].soft_shadow_scale * blur_factor, pssm_coord, 1.0);
+		if (directional_lights.data[i].blend_splits) {
+			float pssm_blend;
+			float blur_factor2;
+
+			if (depth_z < directional_lights.data[i].shadow_split_offsets.x) {
+				vec4 v = vec4(vertex, 1.0);
+				BIAS_FUNC(v, 1)
+				pssm_coord = (directional_lights.data[i].shadow_matrix2 * v);
+				pssm_blend = smoothstep(0.0, directional_lights.data[i].shadow_split_offsets.x, depth_z);
+				// Adjust shadow blur with reference to the first split to reduce discrepancy between shadow splits.
+				blur_factor2 = directional_lights.data[i].shadow_split_offsets.x / directional_lights.data[i].shadow_split_offsets.y;
+			} else if (depth_z < directional_lights.data[i].shadow_split_offsets.y) {
+				vec4 v = vec4(vertex, 1.0);
+				BIAS_FUNC(v, 2)
+				pssm_coord = (directional_lights.data[i].shadow_matrix3 * v);
+				pssm_blend = smoothstep(directional_lights.data[i].shadow_split_offsets.x, directional_lights.data[i].shadow_split_offsets.y, depth_z);
+				// Adjust shadow blur with reference to the first split to reduce discrepancy between shadow splits.
+				blur_factor2 = directional_lights.data[i].shadow_split_offsets.x / directional_lights.data[i].shadow_split_offsets.z;
+			} else if (depth_z < directional_lights.data[i].shadow_split_offsets.z) {
+				vec4 v = vec4(vertex, 1.0);
+				BIAS_FUNC(v, 3)
+				pssm_coord = (directional_lights.data[i].shadow_matrix4 * v);
+				pssm_blend = smoothstep(directional_lights.data[i].shadow_split_offsets.y, directional_lights.data[i].shadow_split_offsets.z, depth_z);
+				// Adjust shadow blur with reference to the first split to reduce discrepancy between shadow splits.
+				blur_factor2 = directional_lights.data[i].shadow_split_offsets.x / directional_lights.data[i].shadow_split_offsets.w;
+			} else {
+				pssm_blend = 0.0; //if no blend, same coord will be used (divide by z will result in same value, and already cached)
+				blur_factor2 = 1.0;
+			}
+
+			pssm_coord /= pssm_coord.w;
+
+			float shadow2 = sample_directional_pcf_shadow(directional_shadow_atlas, directional_shadow_pixel_size * directional_lights.data[i].soft_shadow_scale * blur_factor2, pssm_coord, 1.0);
+			shadow = mix(shadow, shadow2, pssm_blend);
+		}
+
+		shadow = mix(shadow, 1.0, smoothstep(directional_lights.data[i].fade_from, directional_lights.data[i].fade_to, vertex.z)); //done with negative values for performance
+
+#undef BIAS_FUNC
+	} // shadows
+
+	if (i < 4) {
+		shadow0 |= uint(clamp(shadow * 255.0, 0.0, 255.0)) << (i * 8);
+	} else {
+		shadow1 |= uint(clamp(shadow * 255.0, 0.0, 255.0)) << ((i - 4) * 8);
+	}
+#endif // SHADOWS_DISABLED
+}
+
+
+float sample_all_directional_shadows(vec3 vertex) {
+	uint shadow0 = 0;
+	uint shadow1 = 0;
+	uint instance_index = 0;
+	#ifdef USING_MOBILE_RENDERER
+	instance_index = draw_call.instance_index;
+	#else
+	instance_index = instance_index_interp;
+	#endif
+	float shadow = 1.0; // no shadow
+	for (uint i = 0; i < 8; i++) {
+
+		if (i >= scene_data_block.data.directional_light_count) {
+			break;
+		}
+
+		if (!bool(directional_lights.data[i].mask & instances.data[instance_index].layer_mask)) {
+			continue; //not masked
+		}
+
+		if (directional_lights.data[i].bake_mode == LIGHT_BAKE_STATIC && bool(instances.data[instance_index].flags & INSTANCE_FLAGS_USE_LIGHTMAP)) {
+			continue; // Statically baked light and object uses lightmap, skip
+		}
+
+		light_process_directional_shadow(i, vertex, scene_data_block.data.directional_shadow_pixel_size, shadow0, shadow1);
+
+		if (i < 4) {
+			shadow0 |= uint(clamp(shadow * 255.0, 0.0, 255.0)) << (i * 8);
+		} else {
+			shadow1 |= uint(clamp(shadow * 255.0, 0.0, 255.0)) << ((i - 4) * 8);
+		}
+
+	}
+	return shadow;
+
+}
+
+// GREVOUT
+
+float get_omni_attenuation(float distance, float inv_range, float decay) {
+	float nd = distance * inv_range;
+	nd *= nd;
+	nd *= nd; // nd^4
+	nd = max(1.0 - nd, 0.0);
+	nd *= nd; // nd^2
+	return nd * pow(max(distance, 0.0001), -decay);
+}
+
+// GREVIN
+
+#define sample_omni_shadow light_process_omni_shadow
+//position
+vec3 get_omni_light_pos(uint idx) {
+	return omni_lights.data[idx].position;
+}
+vec3 get_omni_light_data(uint idx) {
+	return vec3(omni_lights.data[idx].mask, omni_lights.data[idx].inv_radius, omni_lights.data[idx].attenuation);
+}
+float measure_omni_attenuation(uint idx, vec3 vertex) {
+	vec3 light_rel_vec = omni_lights.data[idx].position - vertex;
+	float light_length = length(light_rel_vec);
+	float omni_attenuation = get_omni_attenuation(light_length, omni_lights.data[idx].inv_radius, omni_lights.data[idx].attenuation);
+	return omni_attenuation;
+}
+// GREVOUT
+
+float light_process_omni_shadow(uint idx, vec3 vertex, vec3 normal) {
+#ifndef SHADOWS_DISABLED
+	if (omni_lights.data[idx].shadow_opacity > 0.001) {
+		// there is a shadowmap
+		vec2 texel_size = scene_data_block.data.shadow_atlas_pixel_size;
+		vec4 base_uv_rect = omni_lights.data[idx].atlas_rect;
+		base_uv_rect.xy += texel_size;
+		base_uv_rect.zw -= texel_size * 2.0;
+
+		// Omni lights use direction.xy to store to store the offset between the two paraboloid regions
+		vec2 flip_offset = omni_lights.data[idx].direction.xy;
+
+		vec3 local_vert = (omni_lights.data[idx].shadow_matrix * vec4(vertex, 1.0)).xyz;
+
+		float shadow_len = length(local_vert); //need to remember shadow len from here
+		vec3 shadow_dir = normalize(local_vert);
+
+		vec3 local_normal = normalize(mat3(omni_lights.data[idx].shadow_matrix) * normal);
+		vec3 normal_bias = local_normal * omni_lights.data[idx].shadow_normal_bias * (1.0 - abs(dot(local_normal, shadow_dir)));
+
+		float shadow;
+
+		vec4 uv_rect = base_uv_rect;
+
+		vec3 shadow_sample = normalize(shadow_dir + normal_bias);
+		if (shadow_sample.z >= 0.0) {
+			uv_rect.xy += flip_offset;
+			flip_offset *= -1.0;
+		}
+
+		shadow_sample.z = 1.0 + abs(shadow_sample.z);
+		vec2 pos = shadow_sample.xy / shadow_sample.z;
+		float depth = shadow_len - omni_lights.data[idx].shadow_bias;
+		depth *= omni_lights.data[idx].inv_radius;
+		depth = 1.0 - depth;
+		shadow = mix(1.0, sample_omni_pcf_shadow(shadow_atlas, omni_lights.data[idx].soft_shadow_scale / shadow_sample.z, pos, uv_rect, flip_offset, depth, 1.0), omni_lights.data[idx].shadow_opacity);
+
+		return shadow;
+	}
+#endif
+
+	return 1.0;
+}
+
+float sample_directional_shadow(uint idx, vec3 vertex) {
+	uint shadow0 = 0;
+	uint shadow1 = 0;
+
+	float shadow = 1.0; // no shadow
+
+	light_process_directional_shadow(idx, vertex, scene_data_block.data.directional_shadow_pixel_size, shadow0, shadow1);
+
+	if (idx < 4) {
+		shadow = float(shadow0 >> (idx * 8u) & 0xFFu) / 255.0;
+	} else {
+		shadow = float(shadow1 >> ((idx - 4u) * 8u) & 0xFFu) / 255.0;
+	}
+
+	return shadow;
+}
+
+// GREVIN
+#define sample_spot_shadow light_process_spot_shadow
+
+float measure_spot_attenuation(uint idx, vec3 vertex) {
+	vec3 light_rel_vec = spot_lights.data[idx].position - vertex;
+	float light_length = length(light_rel_vec);
+	float spot_attenuation = get_omni_attenuation(light_length, spot_lights.data[idx].inv_radius, spot_lights.data[idx].attenuation);
+	vec3 spot_dir = spot_lights.data[idx].direction;
+	highp float cone_angle = spot_lights.data[idx].cone_angle;
+	float scos = max(dot(-normalize(light_rel_vec), spot_dir), cone_angle);
+	float spot_rim = max(0.0001, (1.0 - scos) / (1.0 - cone_angle));
+	spot_attenuation *= 1.0 - pow(spot_rim, spot_lights.data[idx].cone_attenuation);
+	return spot_attenuation;
+}
+// GREVOUT
+
 void light_compute(vec3 N, vec3 L, vec3 V, float A, vec3 light_color, bool is_directional, float attenuation, vec3 f0, uint orms, float specular_amount, vec3 albedo, inout float alpha, vec2 screen_uv,
 #ifdef LIGHT_BACKLIGHT_USED
 		vec3 backlight,
@@ -70,6 +478,12 @@ void light_compute(vec3 N, vec3 L, vec3 V, float A, vec3 light_color, bool is_di
 #endif
 #ifdef LIGHT_ANISOTROPY_USED
 		vec3 B, vec3 T, float anisotropy,
+#endif
+#ifdef LIGHT_SOURCE_INFO
+bool light_has_direction, bool light_has_range,
+#endif
+#ifdef LIGHT_INDEX_USED
+uint light_index,
 #endif
 		inout vec3 diffuse_light, inout vec3 specular_light) {
 	vec4 orms_unpacked = unpackUnorm4x8(orms);
@@ -242,168 +656,6 @@ void light_compute(vec3 N, vec3 L, vec3 V, float A, vec3 light_color, bool is_di
 #endif // LIGHT_CODE_USED
 }
 
-#ifndef SHADOWS_DISABLED
-
-// Interleaved Gradient Noise
-// https://www.iryoku.com/next-generation-post-processing-in-call-of-duty-advanced-warfare
-float quick_hash(vec2 pos) {
-	const vec3 magic = vec3(0.06711056f, 0.00583715f, 52.9829189f);
-	return fract(magic.z * fract(dot(pos, magic.xy)));
-}
-
-float sample_directional_pcf_shadow(texture2D shadow, vec2 shadow_pixel_size, vec4 coord, float taa_frame_count) {
-	vec2 pos = coord.xy;
-	float depth = coord.z;
-
-	//if only one sample is taken, take it from the center
-	if (sc_directional_soft_shadow_samples() == 0) {
-		return textureProj(sampler2DShadow(shadow, shadow_sampler), vec4(pos, depth, 1.0));
-	}
-
-	mat2 disk_rotation;
-	{
-		float r = quick_hash(gl_FragCoord.xy + vec2(taa_frame_count * 5.588238)) * 2.0 * M_PI;
-		float sr = sin(r);
-		float cr = cos(r);
-		disk_rotation = mat2(vec2(cr, -sr), vec2(sr, cr));
-	}
-
-	float avg = 0.0;
-
-	SPEC_CONSTANT_LOOP_ANNOTATION
-	for (uint i = 0; i < sc_directional_soft_shadow_samples(); i++) {
-		avg += textureProj(sampler2DShadow(shadow, shadow_sampler), vec4(pos + shadow_pixel_size * (disk_rotation * scene_data_block.data.directional_soft_shadow_kernel[i].xy), depth, 1.0));
-	}
-
-	return avg * (1.0 / float(sc_directional_soft_shadow_samples()));
-}
-
-float sample_pcf_shadow(texture2D shadow, vec2 shadow_pixel_size, vec3 coord, float taa_frame_count) {
-	vec2 pos = coord.xy;
-	float depth = coord.z;
-
-	//if only one sample is taken, take it from the center
-	if (sc_soft_shadow_samples() == 0) {
-		return textureProj(sampler2DShadow(shadow, shadow_sampler), vec4(pos, depth, 1.0));
-	}
-
-	mat2 disk_rotation;
-	{
-		float r = quick_hash(gl_FragCoord.xy + vec2(taa_frame_count * 5.588238)) * 2.0 * M_PI;
-		float sr = sin(r);
-		float cr = cos(r);
-		disk_rotation = mat2(vec2(cr, -sr), vec2(sr, cr));
-	}
-
-	float avg = 0.0;
-
-	SPEC_CONSTANT_LOOP_ANNOTATION
-	for (uint i = 0; i < sc_soft_shadow_samples(); i++) {
-		avg += textureProj(sampler2DShadow(shadow, shadow_sampler), vec4(pos + shadow_pixel_size * (disk_rotation * scene_data_block.data.soft_shadow_kernel[i].xy), depth, 1.0));
-	}
-
-	return avg * (1.0 / float(sc_soft_shadow_samples()));
-}
-
-float sample_omni_pcf_shadow(texture2D shadow, float blur_scale, vec2 coord, vec4 uv_rect, vec2 flip_offset, float depth, float taa_frame_count) {
-	//if only one sample is taken, take it from the center
-	if (sc_soft_shadow_samples() == 0) {
-		vec2 pos = coord * 0.5 + 0.5;
-		pos = uv_rect.xy + pos * uv_rect.zw;
-		return textureProj(sampler2DShadow(shadow, shadow_sampler), vec4(pos, depth, 1.0));
-	}
-
-	mat2 disk_rotation;
-	{
-		float r = quick_hash(gl_FragCoord.xy + vec2(taa_frame_count * 5.588238)) * 2.0 * M_PI;
-		float sr = sin(r);
-		float cr = cos(r);
-		disk_rotation = mat2(vec2(cr, -sr), vec2(sr, cr));
-	}
-
-	float avg = 0.0;
-	vec2 offset_scale = blur_scale * 2.0 * scene_data_block.data.shadow_atlas_pixel_size / uv_rect.zw;
-
-	SPEC_CONSTANT_LOOP_ANNOTATION
-	for (uint i = 0; i < sc_soft_shadow_samples(); i++) {
-		vec2 offset = offset_scale * (disk_rotation * scene_data_block.data.soft_shadow_kernel[i].xy);
-		vec2 sample_coord = coord + offset;
-
-		float sample_coord_length_squared = dot(sample_coord, sample_coord);
-		bool do_flip = sample_coord_length_squared > 1.0;
-
-		if (do_flip) {
-			float len = sqrt(sample_coord_length_squared);
-			sample_coord = sample_coord * (2.0 / len - 1.0);
-		}
-
-		sample_coord = sample_coord * 0.5 + 0.5;
-		sample_coord = uv_rect.xy + sample_coord * uv_rect.zw;
-
-		if (do_flip) {
-			sample_coord += flip_offset;
-		}
-		avg += textureProj(sampler2DShadow(shadow, shadow_sampler), vec4(sample_coord, depth, 1.0));
-	}
-
-	return avg * (1.0 / float(sc_soft_shadow_samples()));
-}
-
-float sample_directional_soft_shadow(texture2D shadow, vec3 pssm_coord, vec2 tex_scale, float taa_frame_count) {
-	//find blocker
-	float blocker_count = 0.0;
-	float blocker_average = 0.0;
-
-	mat2 disk_rotation;
-	{
-		float r = quick_hash(gl_FragCoord.xy + vec2(taa_frame_count * 5.588238)) * 2.0 * M_PI;
-		float sr = sin(r);
-		float cr = cos(r);
-		disk_rotation = mat2(vec2(cr, -sr), vec2(sr, cr));
-	}
-
-	SPEC_CONSTANT_LOOP_ANNOTATION
-	for (uint i = 0; i < sc_directional_penumbra_shadow_samples(); i++) {
-		vec2 suv = pssm_coord.xy + (disk_rotation * scene_data_block.data.directional_penumbra_shadow_kernel[i].xy) * tex_scale;
-		float d = textureLod(sampler2D(shadow, SAMPLER_LINEAR_CLAMP), suv, 0.0).r;
-		if (d > pssm_coord.z) {
-			blocker_average += d;
-			blocker_count += 1.0;
-		}
-	}
-
-	if (blocker_count > 0.0) {
-		//blockers found, do soft shadow
-		blocker_average /= blocker_count;
-		float penumbra = (-pssm_coord.z + blocker_average) / (1.0 - blocker_average);
-		tex_scale *= penumbra;
-
-		float s = 0.0;
-
-		SPEC_CONSTANT_LOOP_ANNOTATION
-		for (uint i = 0; i < sc_directional_penumbra_shadow_samples(); i++) {
-			vec2 suv = pssm_coord.xy + (disk_rotation * scene_data_block.data.directional_penumbra_shadow_kernel[i].xy) * tex_scale;
-			s += textureProj(sampler2DShadow(shadow, shadow_sampler), vec4(suv, pssm_coord.z, 1.0));
-		}
-
-		return s / float(sc_directional_penumbra_shadow_samples());
-
-	} else {
-		//no blockers found, so no shadow
-		return 1.0;
-	}
-}
-
-#endif // SHADOWS_DISABLED
-
-float get_omni_attenuation(float distance, float inv_range, float decay) {
-	float nd = distance * inv_range;
-	nd *= nd;
-	nd *= nd; // nd^4
-	nd = max(1.0 - nd, 0.0);
-	nd *= nd; // nd^2
-	return nd * pow(max(distance, 0.0001), -decay);
-}
 
 void light_process_omni(uint idx, vec3 vertex, vec3 eye_vec, vec3 normal, vec3 vertex_ddx, vec3 vertex_ddy, vec3 f0, uint orms, float taa_frame_count, vec3 albedo, inout float alpha, vec2 screen_uv,
 #ifdef LIGHT_BACKLIGHT_USED
@@ -425,6 +677,12 @@ void light_process_omni(uint idx, vec3 vertex, vec3 eye_vec, vec3 normal, vec3 v
 #endif
 		inout vec3 diffuse_light, inout vec3 specular_light) {
 	const float EPSILON = 1e-6f;
+
+#ifdef LIGHT_SOURCE_INFO
+// let's set a boolean variable using the way we previously discussed
+bool _light_has_direction = false;
+bool _light_has_range = true;
+#endif
 
 	// Omni light attenuation.
 	vec3 light_rel_vec = omni_lights.data[idx].position - vertex;
@@ -686,6 +944,12 @@ void light_process_omni(uint idx, vec3 vertex, vec3 eye_vec, vec3 normal, vec3 v
 #ifdef LIGHT_ANISOTROPY_USED
 			binormal, tangent, anisotropy,
 #endif
+#ifdef LIGHT_SOURCE_INFO
+		_light_has_direction, _light_has_range,
+#endif
+#ifdef LIGHT_INDEX_USED
+		idx,
+#endif
 			diffuse_light,
 			specular_light);
 }
@@ -724,6 +988,11 @@ void light_process_spot(uint idx, vec3 vertex, vec3 eye_vec, vec3 normal, vec3 v
 		inout vec3 specular_light) {
 	const float EPSILON = 1e-6f;
 
+#ifdef LIGHT_SOURCE_INFO
+// let's set a boolean variable using the way we previously discussed
+bool _light_has_direction = false;
+bool _light_has_range = true;
+#endif
 	// Spot light attenuation.
 	vec3 light_rel_vec = spot_lights.data[idx].position - vertex;
 	float light_length = length(light_rel_vec);
@@ -889,6 +1158,12 @@ void light_process_spot(uint idx, vec3 vertex, vec3 eye_vec, vec3 normal, vec3 v
 #endif
 #ifdef LIGHT_ANISOTROPY_USED
 			binormal, tangent, anisotropy,
+#endif
+#ifdef LIGHT_SOURCE_INFO
+		_light_has_direction, _light_has_range,
+#endif
+#ifdef LIGHT_INDEX_USED
+		idx,
 #endif
 			diffuse_light, specular_light);
 }

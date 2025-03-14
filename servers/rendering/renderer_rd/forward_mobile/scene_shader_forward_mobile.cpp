@@ -618,6 +618,9 @@ void SceneShaderForwardMobile::init(const String p_defines) {
 		actions.renames["ATTENUATION"] = "attenuation";
 		actions.renames["DIFFUSE_LIGHT"] = "diffuse_light";
 		actions.renames["SPECULAR_LIGHT"] = "specular_light";
+		actions.renames["LIGHT_HAS_DIRECTION"] = "light_has_direction";
+		actions.renames["LIGHT_HAS_RANGE"] = "light_has_range";
+		actions.renames["LIGHT_INDEX"] = "light_index";
 
 		actions.usage_defines["NORMAL"] = "#define NORMAL_USED\n";
 		actions.usage_defines["TANGENT"] = "#define TANGENT_USED\n";
@@ -655,7 +658,13 @@ void SceneShaderForwardMobile::init(const String p_defines) {
 		actions.usage_defines["SSS_TRANSMITTANCE_DEPTH"] = "#define ENABLE_TRANSMITTANCE\n";
 		actions.usage_defines["BACKLIGHT"] = "#define LIGHT_BACKLIGHT_USED\n";
 		actions.usage_defines["SCREEN_UV"] = "#define SCREEN_UV_USED\n";
-
+		
+		// we also can add defines for our new code to make sure, that
+		// shader will not run the code when our new buld-ins are not used
+		actions.usage_defines["LIGHT_HAS_DIRECTION"] = "#define LIGHT_SOURCE_INFO\n";
+		actions.usage_defines["LIGHT_HAS_RANGE"] = "#define LIGHT_SOURCE_INFO\n";
+		actions.usage_defines["LIGHT_INDEX"] = "#define LIGHT_INDEX_USED\n";
+		
 		actions.usage_defines["FOG"] = "#define CUSTOM_FOG_USED\n";
 		actions.usage_defines["RADIANCE"] = "#define CUSTOM_RADIANCE_USED\n";
 		actions.usage_defines["IRRADIANCE"] = "#define CUSTOM_IRRADIANCE_USED\n";
