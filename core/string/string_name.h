@@ -45,11 +45,7 @@ struct StaticCString {
 };
 
 class StringName {
-	enum {
-		STRING_TABLE_BITS = 16,
-		STRING_TABLE_LEN = 1 << STRING_TABLE_BITS,
-		STRING_TABLE_MASK = STRING_TABLE_LEN - 1
-	};
+	struct TableEntry;
 
 	struct _Data {
 		SafeRefCount refcount;
@@ -60,19 +56,14 @@ class StringName {
 		uint32_t debug_references = 0;
 #endif
 		String get_name() const { return cname ? String(cname) : name; }
+
 		bool operator==(const String &p_name) const;
-		bool operator!=(const String &p_name) const;
 		bool operator==(const char *p_name) const;
-		bool operator!=(const char *p_name) const;
 
 		int idx = 0;
 		uint32_t hash = 0;
-		_Data *prev = nullptr;
-		_Data *next = nullptr;
 		_Data() {}
 	};
-
-	static inline _Data *_table[STRING_TABLE_LEN];
 
 	_Data *_data = nullptr;
 
@@ -161,10 +152,6 @@ public:
 
 		return String();
 	}
-
-	static StringName search(const char *p_name);
-	static StringName search(const char32_t *p_name);
-	static StringName search(const String &p_name);
 
 	struct AlphCompare {
 		_FORCE_INLINE_ bool operator()(const StringName &l, const StringName &r) const {
