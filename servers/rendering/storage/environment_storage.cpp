@@ -251,6 +251,9 @@ float RendererEnvironmentStorage::environment_get_white(RID p_env, bool p_limit_
 			// is maintained in the shoulder.
 			return agx_white * p_output_max_value;
 		}
+	} else if(env->tone_mapper == RSE::ENV_TONE_MAPPER_AGX_PUNCHY)
+	{
+		return env->white;
 	} else { // Reinhard
 		// The Reinhard tonemapper is not designed to have a white parameter
 		// that is less than the output max value. This is especially important
@@ -338,6 +341,8 @@ RendererEnvironmentStorage::TonemapParameters RendererEnvironmentStorage::enviro
 		tonemap_parameters.awp_toe_a = awp_toe_a;
 		tonemap_parameters.awp_slope = awp_slope;
 		tonemap_parameters.awp_w = awp_w;
+	} else if (env->tone_mapper == RSE::ENV_TONE_MAPPER_AGX_PUNCHY) {
+		tonemap_parameters.white_squared = white;
 	}
 
 	return tonemap_parameters;
