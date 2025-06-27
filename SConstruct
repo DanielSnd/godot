@@ -204,7 +204,7 @@ opts.Add("custom_modules", "A list of comma-separated directory paths containing
 opts.Add(BoolVariable("custom_modules_recursive", "Detect custom modules recursively for each specified path.", True))
 opts.Add(BoolVariable("accesskit", "Use AccessKit C SDK", True))
 opts.Add(("accesskit_sdk_path", "Path to the AccessKit C SDK", ""))
-opts.Add(BoolVariable("use_breakpad", "Enable Breakpad crash dump creation.", True))
+opts.Add(BoolVariable("use_breakpad", "Enable Breakpad crash dump creation.", False))
 # Advanced options
 opts.Add(
     BoolVariable(
