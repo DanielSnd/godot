@@ -74,7 +74,11 @@ public:
 
 private:
 	friend class AudioStreamPlaybackInteractive;
-	int sample_rate = 44100;
+	#ifdef ANDROID_ENABLED
+		int sample_rate = 48000;
+	#else
+		int sample_rate = 44100;
+	#endif
 	bool stereo = true;
 	int initial_clip = 0;
 
@@ -207,7 +211,11 @@ private:
 	uint64_t version = 0;
 
 	enum {
-		BUFFER_SIZE = 1024
+		#ifdef ANDROID_ENABLED
+			BUFFER_SIZE = 256
+		#else
+			BUFFER_SIZE = 1024
+		#endif
 	};
 
 	AudioFrame mix_buffer[BUFFER_SIZE];
