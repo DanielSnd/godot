@@ -96,8 +96,11 @@ void AudioDriverOpenSL::start() {
 	active = false;
 
 	SLresult res;
-
-	buffer_size = 1024;
+	#ifdef ANDROID_ENABLED
+		buffer_size = 256;
+	#else
+		buffer_size = 1024;
+	#endif
 
 	for (int i = 0; i < BUFFER_COUNT; i++) {
 		buffers[i] = memnew_arr(int16_t, buffer_size * 2);
@@ -128,7 +131,11 @@ void AudioDriverOpenSL::start() {
 	/* Setup the format of the content in the buffer queue */
 	pcm.formatType = SL_DATAFORMAT_PCM;
 	pcm.numChannels = 2;
-	pcm.samplesPerSec = SL_SAMPLINGRATE_44_1;
+	#ifdef ANDROID_ENABLED
+		pcm.samplesPerSec = SL_SAMPLINGRATE_48;
+	#else
+		pcm.samplesPerSec = SL_SAMPLINGRATE_44_1;
+	#endif
 	pcm.bitsPerSample = SL_PCMSAMPLEFORMAT_FIXED_16;
 	pcm.containerSize = SL_PCMSAMPLEFORMAT_FIXED_16;
 	pcm.channelMask = SL_SPEAKER_FRONT_LEFT | SL_SPEAKER_FRONT_RIGHT;
@@ -299,7 +306,11 @@ Error AudioDriverOpenSL::input_stop() {
 }
 
 int AudioDriverOpenSL::get_mix_rate() const {
-	return 44100; // hardcoded for Android, as selected by SL_SAMPLINGRATE_44_1
+	#ifdef ANDROID_ENABLED
+		return 48000; // hardcoded for Android, as selected by SL_SAMPLINGRATE_48
+	#else
+		return 44100;
+	#endif
 }
 
 AudioDriver::SpeakerMode AudioDriverOpenSL::get_speaker_mode() const {
