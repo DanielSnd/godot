@@ -169,7 +169,11 @@ class AudioDriverManager {
 	static AudioDriverDummy dummy_driver;
 
 public:
+#ifdef ANDROID_ENABLED
+	static const int DEFAULT_MIX_RATE = 48000;
+#else
 	static const int DEFAULT_MIX_RATE = 44100;
+#endif
 
 	static void add_driver(AudioDriver *p_driver);
 	static void initialize(int p_driver);
