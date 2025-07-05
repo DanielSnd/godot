@@ -44,6 +44,7 @@
 #include <SDL3/SDL_gamepad.h>
 #include <SDL3/SDL_iostream.h>
 #include <SDL3/SDL_joystick.h>
+#include <SDL3/SDL_log.h>
 
 JoypadSDL *JoypadSDL::singleton = nullptr;
 
@@ -74,9 +75,43 @@ JoypadSDL *JoypadSDL::get_singleton() {
 	return singleton;
 }
 
+static void MyLogOutput(void *userdata, int category, SDL_LogPriority priority, const char *message)
+{
+	 const char* categories[] = {
+        "APP",
+        "ERROR",
+        "ASSERT",
+        "SYSTEM",
+        "AUDIO",
+        "VIDEO",
+        "RENDER",
+        "INPUT",
+        "TEST",
+        "GPU"
+    };
+    
+    const char* priorities[] = {
+		NULL,
+		"TRACE", // 1
+        "VERBOSE", // 2
+        "DEBUG", // 3
+        "INFO", // 4
+        "WARN", // 5
+        "ERROR", // 6
+        "CRITICAL" // 7
+    };
+	
+	print_verbose(vformat("SDL: %s %s %s", categories[category], priorities[priority], message));
+}
+
 Error JoypadSDL::initialize() {
 	SDL_SetHint(SDL_HINT_JOYSTICK_THREAD, "1");
+	SDL_SetHint(SDL_HINT_LOGGING, "app=verbose,error=verbose,assert=verbose,system=verbose,audio=verbose,video=verbose,render=verbose,input=verbose,test=verbose");
+	SDL_SetLogOutputFunction(MyLogOutput, nullptr);
 	SDL_SetHint(SDL_HINT_NO_SIGNAL_HANDLERS, "1");
+	SDL_SetHint(SDL_HINT_JOYSTICK_HIDAPI, "1");
+	SDL_SetHint(SDL_HINT_JOYSTICK_HIDAPI_STEAMDECK, "1");
+	SDL_SetHint("SDL_GAMECONTROLLER_ALLOW_STEAM_VIRTUAL_GAMEPAD", "1");
 	ERR_FAIL_COND_V_MSG(!SDL_Init(SDL_INIT_JOYSTICK | SDL_INIT_GAMEPAD), FAILED, SDL_GetError());
 
 	// Add Godot's mapping database from memory

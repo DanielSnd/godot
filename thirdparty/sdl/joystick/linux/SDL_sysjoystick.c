@@ -224,14 +224,19 @@ static bool GetSteamVirtualGamepadSlot(int fd, int *slot)
     char name[128];
 
     if (ioctl(fd, EVIOCGNAME(sizeof(name)), name) > 0) {
+        SDL_LogDebug(SDL_LOG_CATEGORY_INPUT, "GetSteamVirtualGamepadSlot: Device name: %s", name);
         const char *digits = SDL_strstr(name, "pad ");
         if (digits) {
             digits += 4;
             if (SDL_isdigit(*digits)) {
                 *slot = SDL_atoi(digits);
+                SDL_LogDebug(SDL_LOG_CATEGORY_INPUT, "GetSteamVirtualGamepadSlot: Found slot %d", *slot);
                 return true;
             }
         }
+        SDL_LogDebug(SDL_LOG_CATEGORY_INPUT, "GetSteamVirtualGamepadSlot: Could not parse slot from name: %s", name);
+    } else {
+        SDL_LogDebug(SDL_LOG_CATEGORY_INPUT, "GetSteamVirtualGamepadSlot: Failed to get device name");
     }
     return false;
 }
@@ -248,6 +253,7 @@ static int GuessDeviceClass(int fd)
         (ioctl(fd, EVIOCGBIT(EV_KEY, sizeof(keybit)), keybit) < 0) ||
         (ioctl(fd, EVIOCGBIT(EV_REL, sizeof(relbit)), relbit) < 0) ||
         (ioctl(fd, EVIOCGBIT(EV_ABS, sizeof(absbit)), absbit) < 0)) {
+        SDL_LogDebug(SDL_LOG_CATEGORY_INPUT, "GuessDeviceClass: Failed to get device capabilities");
         return 0;
     }
 
@@ -255,15 +261,33 @@ static int GuessDeviceClass(int fd)
      * device just doesn't have any properties. */
     (void) ioctl(fd, EVIOCGPROP(sizeof(propbit)), propbit);
 
-    return SDL_EVDEV_GuessDeviceClass(propbit, evbit, absbit, keybit, relbit);
+    // Get device info for Steam Deck detection
+    struct input_id inpid;
+    if (ioctl(fd, EVIOCGID, &inpid) >= 0) {
+        SDL_LogDebug(SDL_LOG_CATEGORY_INPUT, "GuessDeviceClass: Device vendor=0x%04x, product=0x%04x", inpid.vendor, inpid.product);
+        
+        // Special handling for Steam Deck controllers
+        if (inpid.vendor == USB_VENDOR_VALVE && inpid.product == 0x1205) {
+            SDL_LogDebug(SDL_LOG_CATEGORY_INPUT, "GuessDeviceClass: Steam Deck controller detected, forcing joystick classification");
+            return SDL_UDEV_DEVICE_JOYSTICK;
+        }
+    }
+
+    int device_class = SDL_EVDEV_GuessDeviceClass(propbit, evbit, absbit, keybit, relbit);
+    SDL_LogDebug(SDL_LOG_CATEGORY_INPUT, "GuessDeviceClass: Device class returned: 0x%x", device_class);
+    return device_class;
 }
 
 static bool GuessIsJoystick(int fd)
 {
-    if (GuessDeviceClass(fd) & SDL_UDEV_DEVICE_JOYSTICK) {
-        return true;
+    bool result = false;
+    int device_class = GuessDeviceClass(fd);
+    if (device_class & SDL_UDEV_DEVICE_JOYSTICK) {
+        result = true;
     }
-    return false;
+    SDL_LogDebug(SDL_LOG_CATEGORY_INPUT, "GuessIsJoystick: Device class 0x%x, joystick bit: 0x%x, result: %s", 
+                device_class, SDL_UDEV_DEVICE_JOYSTICK, result ? "true" : "false");
+    return result;
 }
 
 static bool GuessIsSensor(int fd)
@@ -286,6 +310,7 @@ static bool IsJoystick(const char *path, int *fd, char **name_return, Uint16 *ve
     // Opening input devices can generate synchronous device I/O, so avoid it if we can
     if (SDL_UDEV_GetProductInfo(path, &inpid.vendor, &inpid.product, &inpid.version, &class) &&
         !(class & SDL_UDEV_DEVICE_JOYSTICK)) {
+        SDL_LogDebug(SDL_LOG_CATEGORY_INPUT, "IsJoystick: udev says %s is not a joystick (class=0x%x)", path, class);
         return false;
     }
 #endif
@@ -294,32 +319,54 @@ static bool IsJoystick(const char *path, int *fd, char **name_return, Uint16 *ve
         *fd = open(path, O_RDONLY | O_CLOEXEC, 0);
     }
     if (!fd || *fd < 0) {
+        SDL_LogDebug(SDL_LOG_CATEGORY_INPUT, "IsJoystick: Failed to open %s: %s", path, strerror(errno));
         return false;
     }
 
     if (ioctl(*fd, JSIOCGNAME(sizeof(product_string)), product_string) <= 0) {
         // When udev enumeration or classification, we only got joysticks here, so no need to test
         if (enumeration_method != ENUMERATION_LIBUDEV && !class && !GuessIsJoystick(*fd)) {
+            SDL_LogDebug(SDL_LOG_CATEGORY_INPUT, "IsJoystick: %s is not a joystick according to GuessIsJoystick", path);
             return false;
         }
 
         // Could have vendor and product already from udev, but should agree with evdev
         if (ioctl(*fd, EVIOCGID, &inpid) < 0) {
+            SDL_LogDebug(SDL_LOG_CATEGORY_INPUT, "IsJoystick: Failed to get input ID for %s: %s", path, strerror(errno));
             return false;
         }
 
         if (ioctl(*fd, EVIOCGNAME(sizeof(product_string)), product_string) < 0) {
+            SDL_LogDebug(SDL_LOG_CATEGORY_INPUT, "IsJoystick: Failed to get product name for %s: %s", path, strerror(errno));
             return false;
         }
     }
 
     name = SDL_CreateJoystickName(inpid.vendor, inpid.product, NULL, product_string);
     if (!name) {
+        SDL_LogError(SDL_LOG_CATEGORY_INPUT, "IsJoystick: Failed to create joystick name for %s", path);
         return false;
+    }
+
+    SDL_LogDebug(SDL_LOG_CATEGORY_INPUT, "IsJoystick: Device %s - name: %s, vendor: 0x%04x, product: 0x%04x, version: %d", 
+                path, name, inpid.vendor, inpid.product, inpid.version);
+
+    // Special logging for Valve devices (Steam Deck, Steam Controller, etc.)
+    if (inpid.vendor == USB_VENDOR_VALVE) {
+        SDL_LogDebug(SDL_LOG_CATEGORY_INPUT, "IsJoystick: Found Valve device - vendor: 0x%04x, product: 0x%04x, name: %s", 
+                    inpid.vendor, inpid.product, name);
+        if (inpid.product == USB_PRODUCT_STEAM_VIRTUAL_GAMEPAD) {
+            SDL_LogDebug(SDL_LOG_CATEGORY_INPUT, "IsJoystick: This is a Steam virtual gamepad");
+        } else if (inpid.product == USB_PRODUCT_VALVE_STEAM_CONTROLLER_DONGLE) {
+            SDL_LogDebug(SDL_LOG_CATEGORY_INPUT, "IsJoystick: This is a Steam Controller dongle");
+        } else {
+            SDL_LogDebug(SDL_LOG_CATEGORY_INPUT, "IsJoystick: This is an unknown Valve device (product: 0x%04x)", inpid.product);
+        }
     }
 
     if (!IsVirtualJoystick(inpid.vendor, inpid.product, inpid.version, name) &&
         SDL_JoystickHandledByAnotherDriver(&SDL_LINUX_JoystickDriver, inpid.vendor, inpid.product, inpid.version, name)) {
+        SDL_LogDebug(SDL_LOG_CATEGORY_INPUT, "IsJoystick: %s is handled by another driver", path);
         SDL_free(name);
         return false;
     }
@@ -331,6 +378,7 @@ static bool IsJoystick(const char *path, int *fd, char **name_return, Uint16 *ve
 #endif
 
     if (SDL_ShouldIgnoreJoystick(inpid.vendor, inpid.product, inpid.version, name)) {
+        SDL_LogDebug(SDL_LOG_CATEGORY_INPUT, "IsJoystick: %s should be ignored", path);
         SDL_free(name);
         return false;
     }
@@ -338,6 +386,7 @@ static bool IsJoystick(const char *path, int *fd, char **name_return, Uint16 *ve
     *vendor_return = inpid.vendor;
     *product_return = inpid.product;
     *guid = SDL_CreateJoystickGUID(inpid.bustype, inpid.vendor, inpid.product, inpid.version, NULL, product_string, 0, 0);
+    SDL_LogDebug(SDL_LOG_CATEGORY_INPUT, "IsJoystick: %s is a valid joystick", path);
     return true;
 }
 
@@ -383,35 +432,47 @@ static bool IsSensor(const char *path, int *fd)
 static void joystick_udev_callback(SDL_UDEV_deviceevent udev_type, int udev_class, const char *devpath)
 {
     if (!devpath) {
+        SDL_LogDebug(SDL_LOG_CATEGORY_INPUT, "joystick_udev_callback: NULL devpath received");
         return;
     }
 
+    SDL_LogDebug(SDL_LOG_CATEGORY_INPUT, "joystick_udev_callback: Event type %d, class 0x%x, device %s", 
+                udev_type, udev_class, devpath);
+
     switch (udev_type) {
     case SDL_UDEV_DEVICEADDED:
+        SDL_LogDebug(SDL_LOG_CATEGORY_INPUT, "joystick_udev_callback: Device added: %s (class=0x%x)", devpath, udev_class);
         if (!(udev_class & (SDL_UDEV_DEVICE_JOYSTICK | SDL_UDEV_DEVICE_ACCELEROMETER))) {
+            SDL_LogDebug(SDL_LOG_CATEGORY_INPUT, "joystick_udev_callback: Device %s is not a joystick or accelerometer, ignoring", devpath);
             return;
         }
         if (SDL_classic_joysticks) {
             if (!IsJoystickJSNode(devpath)) {
+                SDL_LogDebug(SDL_LOG_CATEGORY_INPUT, "joystick_udev_callback: Device %s is not a classic joystick node, ignoring", devpath);
                 return;
             }
         } else {
             if (IsJoystickJSNode(devpath)) {
+                SDL_LogDebug(SDL_LOG_CATEGORY_INPUT, "joystick_udev_callback: Device %s is a classic joystick node, ignoring", devpath);
                 return;
             }
         }
 
         // Wait a bit for the hidraw udev node to initialize
+        SDL_LogDebug(SDL_LOG_CATEGORY_INPUT, "joystick_udev_callback: Waiting 10ms for device initialization");
         SDL_Delay(10);
 
+        SDL_LogDebug(SDL_LOG_CATEGORY_INPUT, "joystick_udev_callback: Adding device %s", devpath);
         MaybeAddDevice(devpath);
         break;
 
     case SDL_UDEV_DEVICEREMOVED:
+        SDL_LogDebug(SDL_LOG_CATEGORY_INPUT, "joystick_udev_callback: Device removed: %s", devpath);
         MaybeRemoveDevice(devpath);
         break;
 
     default:
+        SDL_LogDebug(SDL_LOG_CATEGORY_INPUT, "joystick_udev_callback: Unknown event type %d for device %s", udev_type, devpath);
         break;
     }
 }
@@ -442,15 +503,20 @@ static void MaybeAddDevice(const char *path)
     SDL_sensorlist_item *item_sensor;
 
     if (!path) {
+        SDL_LogDebug(SDL_LOG_CATEGORY_INPUT, "MaybeAddDevice: NULL path provided");
         return;
     }
 
+    SDL_LogDebug(SDL_LOG_CATEGORY_INPUT, "MaybeAddDevice: Checking device %s", path);
+
     fd = open(path, O_RDONLY | O_CLOEXEC, 0);
     if (fd < 0) {
+        SDL_LogDebug(SDL_LOG_CATEGORY_INPUT, "MaybeAddDevice: Failed to open %s: %s", path, strerror(errno));
         return;
     }
 
     if (fstat(fd, &sb) == -1) {
+        SDL_LogDebug(SDL_LOG_CATEGORY_INPUT, "MaybeAddDevice: Failed to stat %s: %s", path, strerror(errno));
         close(fd);
         return;
     }
@@ -460,11 +526,13 @@ static void MaybeAddDevice(const char *path)
     // Check to make sure it's not already in list.
     for (item = SDL_joylist; item; item = item->next) {
         if (sb.st_rdev == item->devnum) {
+            SDL_LogDebug(SDL_LOG_CATEGORY_INPUT, "MaybeAddDevice: Device %s already in joystick list", path);
             goto done; // already have this one
         }
     }
     for (item_sensor = SDL_sensorlist; item_sensor; item_sensor = item_sensor->next) {
         if (sb.st_rdev == item_sensor->devnum) {
+            SDL_LogDebug(SDL_LOG_CATEGORY_INPUT, "MaybeAddDevice: Device %s already in sensor list", path);
             goto done; // already have this one
         }
     }
@@ -474,11 +542,13 @@ static void MaybeAddDevice(const char *path)
 #endif
 
     if (IsJoystick(path, &fd, &name, &vendor, &product, &guid)) {
+        SDL_LogDebug(SDL_LOG_CATEGORY_INPUT, "MaybeAddDevice: Found joystick: %s (vendor=0x%04x, product=0x%04x)", path, vendor, product);
 #ifdef DEBUG_INPUT_EVENTS
         SDL_Log("found joystick: %s", path);
 #endif
         item = (SDL_joylist_item *)SDL_calloc(1, sizeof(SDL_joylist_item));
         if (!item) {
+            SDL_LogError(SDL_LOG_CATEGORY_INPUT, "MaybeAddDevice: Failed to allocate joystick item for %s", path);
             SDL_free(name);
             goto done;
         }
@@ -491,10 +561,13 @@ static void MaybeAddDevice(const char *path)
 
         if (vendor == USB_VENDOR_VALVE &&
             product == USB_PRODUCT_STEAM_VIRTUAL_GAMEPAD) {
+            SDL_LogDebug(SDL_LOG_CATEGORY_INPUT, "MaybeAddDevice: Steam virtual gamepad detected");
             GetSteamVirtualGamepadSlot(fd, &item->steam_virtual_gamepad_slot);
+            SDL_LogDebug(SDL_LOG_CATEGORY_INPUT, "MaybeAddDevice: Steam virtual gamepad slot: %d", item->steam_virtual_gamepad_slot);
         }
 
         if ((!item->path) || (!item->name)) {
+            SDL_LogError(SDL_LOG_CATEGORY_INPUT, "MaybeAddDevice: Failed to allocate path or name for joystick");
             FreeJoylistItem(item);
             goto done;
         }
@@ -510,30 +583,39 @@ static void MaybeAddDevice(const char *path)
         // Need to increment the joystick count before we post the event
         ++numjoysticks;
 
+        SDL_LogDebug(SDL_LOG_CATEGORY_INPUT, "MaybeAddDevice: Added joystick %s (instance %d, total joysticks: %d)", 
+                    item->name, item->device_instance, numjoysticks);
+
         SDL_PrivateJoystickAdded(item->device_instance);
         goto done;
     }
 
     if (IsSensor(path, &fd)) {
+        SDL_LogDebug(SDL_LOG_CATEGORY_INPUT, "MaybeAddDevice: Found sensor: %s", path);
 #ifdef DEBUG_INPUT_EVENTS
         SDL_Log("found sensor: %s", path);
 #endif
         item_sensor = (SDL_sensorlist_item *)SDL_calloc(1, sizeof(SDL_sensorlist_item));
         if (!item_sensor) {
+            SDL_LogError(SDL_LOG_CATEGORY_INPUT, "MaybeAddDevice: Failed to allocate sensor item for %s", path);
             goto done;
         }
         item_sensor->devnum = sb.st_rdev;
         item_sensor->path = SDL_strdup(path);
 
         if (!item_sensor->path) {
+            SDL_LogError(SDL_LOG_CATEGORY_INPUT, "MaybeAddDevice: Failed to allocate path for sensor");
             FreeSensorlistItem(item_sensor);
             goto done;
         }
 
         item_sensor->next = SDL_sensorlist;
         SDL_sensorlist = item_sensor;
+        SDL_LogDebug(SDL_LOG_CATEGORY_INPUT, "MaybeAddDevice: Added sensor: %s", path);
         goto done;
     }
+
+    SDL_LogDebug(SDL_LOG_CATEGORY_INPUT, "MaybeAddDevice: Device %s is not a joystick or sensor", path);
 
 done:
     close(fd);
@@ -853,7 +935,11 @@ static void LINUX_ScanSteamVirtualGamepads(void)
     int class;
 #endif
 
+    SDL_LogDebug(SDL_LOG_CATEGORY_INPUT, "LINUX_ScanSteamVirtualGamepads: Scanning for Steam virtual gamepads");
+
     count = scandir("/dev/input", &entries, filter_entries, NULL);
+    SDL_LogDebug(SDL_LOG_CATEGORY_INPUT, "LINUX_ScanSteamVirtualGamepads: Found %d potential devices to check", count);
+    
     for (i = 0; i < count; ++i) {
         (void)SDL_snprintf(path, SDL_arraysize(path), "/dev/input/%s", entries[i]->d_name);
 
@@ -863,6 +949,8 @@ static void LINUX_ScanSteamVirtualGamepads(void)
         SDL_zero(inpid);
         if (SDL_UDEV_GetProductInfo(path, &inpid.vendor, &inpid.product, &inpid.version, &class) &&
             (inpid.vendor != USB_VENDOR_VALVE || inpid.product != USB_PRODUCT_STEAM_VIRTUAL_GAMEPAD)) {
+            SDL_LogDebug(SDL_LOG_CATEGORY_INPUT, "LINUX_ScanSteamVirtualGamepads: Device %s is not a Steam virtual gamepad (vendor=0x%04x, product=0x%04x)", 
+                        path, inpid.vendor, inpid.product);
             free(entries[i]); // This should NOT be SDL_free()
             continue;
         }
@@ -873,6 +961,8 @@ static void LINUX_ScanSteamVirtualGamepads(void)
                 inpid.vendor == USB_VENDOR_VALVE &&
                 inpid.product == USB_PRODUCT_STEAM_VIRTUAL_GAMEPAD &&
                 GetSteamVirtualGamepadSlot(fd, &virtual_gamepad_slot)) {
+                SDL_LogDebug(SDL_LOG_CATEGORY_INPUT, "LINUX_ScanSteamVirtualGamepads: Found Steam virtual gamepad at %s (slot %d)", 
+                            path, virtual_gamepad_slot);
                 VirtualGamepadEntry *new_virtual_gamepads = (VirtualGamepadEntry *)SDL_realloc(virtual_gamepads, (num_virtual_gamepads + 1) * sizeof(*virtual_gamepads));
                 if (new_virtual_gamepads) {
                     VirtualGamepadEntry *entry = &new_virtual_gamepads[num_virtual_gamepads];
@@ -881,26 +971,41 @@ static void LINUX_ScanSteamVirtualGamepads(void)
                     if (entry->path) {
                         virtual_gamepads = new_virtual_gamepads;
                         ++num_virtual_gamepads;
+                        SDL_LogDebug(SDL_LOG_CATEGORY_INPUT, "LINUX_ScanSteamVirtualGamepads: Added Steam virtual gamepad %d", num_virtual_gamepads);
                     } else {
+                        SDL_LogError(SDL_LOG_CATEGORY_INPUT, "LINUX_ScanSteamVirtualGamepads: Failed to allocate path for Steam virtual gamepad");
                         SDL_free(entry->path);
                         SDL_free(new_virtual_gamepads);
                     }
+                } else {
+                    SDL_LogError(SDL_LOG_CATEGORY_INPUT, "LINUX_ScanSteamVirtualGamepads: Failed to allocate memory for Steam virtual gamepad entry");
                 }
+            } else {
+                SDL_LogDebug(SDL_LOG_CATEGORY_INPUT, "LINUX_ScanSteamVirtualGamepads: Device %s is not a Steam virtual gamepad or failed to get slot", path);
             }
             close(fd);
+        } else {
+            SDL_LogDebug(SDL_LOG_CATEGORY_INPUT, "LINUX_ScanSteamVirtualGamepads: Failed to open %s: %s", path, strerror(errno));
         }
         free(entries[i]); // This should NOT be SDL_free()
     }
     free(entries); // This should NOT be SDL_free()
 
+    SDL_LogDebug(SDL_LOG_CATEGORY_INPUT, "LINUX_ScanSteamVirtualGamepads: Found %d Steam virtual gamepads", num_virtual_gamepads);
+
     if (num_virtual_gamepads > 1) {
+        SDL_LogDebug(SDL_LOG_CATEGORY_INPUT, "LINUX_ScanSteamVirtualGamepads: Sorting %d Steam virtual gamepads by slot", num_virtual_gamepads);
         SDL_qsort(virtual_gamepads, num_virtual_gamepads, sizeof(*virtual_gamepads), sort_virtual_gamepads);
     }
     for (i = 0; i < num_virtual_gamepads; ++i) {
+        SDL_LogDebug(SDL_LOG_CATEGORY_INPUT, "LINUX_ScanSteamVirtualGamepads: Adding Steam virtual gamepad %d (slot %d): %s", 
+                    i, virtual_gamepads[i].slot, virtual_gamepads[i].path);
         MaybeAddDevice(virtual_gamepads[i].path);
         SDL_free(virtual_gamepads[i].path);
     }
     SDL_free(virtual_gamepads);
+    
+    SDL_LogDebug(SDL_LOG_CATEGORY_INPUT, "LINUX_ScanSteamVirtualGamepads: Steam virtual gamepad scan complete");
 }
 
 static void LINUX_ScanInputDevices(void)
@@ -909,17 +1014,68 @@ static void LINUX_ScanInputDevices(void)
     struct dirent **entries = NULL;
     char path[PATH_MAX];
 
+    SDL_LogDebug(SDL_LOG_CATEGORY_INPUT, "LINUX_ScanInputDevices: Scanning /dev/input for joystick devices");
+
     count = scandir("/dev/input", &entries, filter_entries, NULL);
+    SDL_LogDebug(SDL_LOG_CATEGORY_INPUT, "LINUX_ScanInputDevices: Found %d potential joystick devices", count);
+    
     if (count > 1) {
         SDL_qsort(entries, count, sizeof(*entries), sort_entries);
     }
     for (i = 0; i < count; ++i) {
         (void)SDL_snprintf(path, SDL_arraysize(path), "/dev/input/%s", entries[i]->d_name);
+        SDL_LogDebug(SDL_LOG_CATEGORY_INPUT, "LINUX_ScanInputDevices: Checking device %s", path);
         MaybeAddDevice(path);
 
         free(entries[i]); // This should NOT be SDL_free()
     }
     free(entries); // This should NOT be SDL_free()
+    
+    SDL_LogDebug(SDL_LOG_CATEGORY_INPUT, "LINUX_ScanInputDevices: Scan complete, total joysticks: %d", numjoysticks);
+}
+
+// Add a function to list all input devices for debugging
+static void LINUX_ListAllInputDevices(void)
+{
+    int i, count;
+    struct dirent **entries = NULL;
+    char path[PATH_MAX];
+    int fd;
+    struct input_id inpid;
+    char name[128];
+
+    SDL_LogDebug(SDL_LOG_CATEGORY_INPUT, "LINUX_ListAllInputDevices: Listing all devices in /dev/input");
+
+    count = scandir("/dev/input", &entries, NULL, alphasort);
+    SDL_LogDebug(SDL_LOG_CATEGORY_INPUT, "LINUX_ListAllInputDevices: Found %d total devices in /dev/input", count);
+    
+    for (i = 0; i < count; ++i) {
+        (void)SDL_snprintf(path, SDL_arraysize(path), "/dev/input/%s", entries[i]->d_name);
+        
+        fd = open(path, O_RDONLY | O_CLOEXEC, 0);
+        if (fd >= 0) {
+            if (ioctl(fd, EVIOCGID, &inpid) >= 0 && 
+                ioctl(fd, EVIOCGNAME(sizeof(name)), name) >= 0) {
+                SDL_LogDebug(SDL_LOG_CATEGORY_INPUT, "LINUX_ListAllInputDevices: Device %s - name: %s, vendor: 0x%04x, product: 0x%04x, version: %d", 
+                            path, name, inpid.vendor, inpid.product, inpid.version);
+                
+                // Special attention to Valve devices
+                if (inpid.vendor == USB_VENDOR_VALVE) {
+                    SDL_LogDebug(SDL_LOG_CATEGORY_INPUT, "LINUX_ListAllInputDevices: *** VALVE DEVICE FOUND *** %s", path);
+                }
+            } else {
+                SDL_LogDebug(SDL_LOG_CATEGORY_INPUT, "LINUX_ListAllInputDevices: Device %s - could not get device info", path);
+            }
+            close(fd);
+        } else {
+            SDL_LogDebug(SDL_LOG_CATEGORY_INPUT, "LINUX_ListAllInputDevices: Device %s - could not open", path);
+        }
+
+        free(entries[i]); // This should NOT be SDL_free()
+    }
+    free(entries); // This should NOT be SDL_free()
+    
+    SDL_LogDebug(SDL_LOG_CATEGORY_INPUT, "LINUX_ListAllInputDevices: Device listing complete");
 }
 
 static void LINUX_FallbackJoystickDetect(void)
@@ -930,14 +1086,19 @@ static void LINUX_FallbackJoystickDetect(void)
     if (!last_joy_detect_time || now >= (last_joy_detect_time + SDL_JOY_DETECT_INTERVAL_MS)) {
         struct stat sb;
 
+        SDL_LogDebug(SDL_LOG_CATEGORY_INPUT, "LINUX_FallbackJoystickDetect: Checking for new devices");
+
         // Opening input devices can generate synchronous device I/O, so avoid it if we can
         if (stat("/dev/input", &sb) == 0 && sb.st_mtime != last_input_dir_mtime) {
+            SDL_LogDebug(SDL_LOG_CATEGORY_INPUT, "LINUX_FallbackJoystickDetect: /dev/input directory modified, rescanning");
             // Look for Steam virtual gamepads first, and sort by Steam controller slot
             LINUX_ScanSteamVirtualGamepads();
 
             LINUX_ScanInputDevices();
 
             last_input_dir_mtime = sb.st_mtime;
+        } else {
+            SDL_LogDebug(SDL_LOG_CATEGORY_INPUT, "LINUX_FallbackJoystickDetect: No changes detected in /dev/input");
         }
 
         last_joy_detect_time = now;
@@ -946,21 +1107,27 @@ static void LINUX_FallbackJoystickDetect(void)
 
 static void LINUX_JoystickDetect(void)
 {
+    SDL_LogDebug(SDL_LOG_CATEGORY_INPUT, "LINUX_JoystickDetect: Starting joystick detection");
+
 #ifdef SDL_USE_LIBUDEV
     if (enumeration_method == ENUMERATION_LIBUDEV) {
+        SDL_LogDebug(SDL_LOG_CATEGORY_INPUT, "LINUX_JoystickDetect: Using udev enumeration");
         SDL_UDEV_Poll();
     } else
 #endif
 #ifdef HAVE_INOTIFY
     if (inotify_fd >= 0 && last_joy_detect_time != 0) {
+        SDL_LogDebug(SDL_LOG_CATEGORY_INPUT, "LINUX_JoystickDetect: Using inotify detection");
         LINUX_InotifyJoystickDetect();
     } else
 #endif
     {
+        SDL_LogDebug(SDL_LOG_CATEGORY_INPUT, "LINUX_JoystickDetect: Using fallback detection");
         LINUX_FallbackJoystickDetect();
     }
 
     HandlePendingRemovals();
+    SDL_LogDebug(SDL_LOG_CATEGORY_INPUT, "LINUX_JoystickDetect: Detection complete, total joysticks: %d", numjoysticks);
 }
 
 static bool LINUX_JoystickIsDevicePresent(Uint16 vendor_id, Uint16 product_id, Uint16 version, const char *name)
@@ -976,13 +1143,21 @@ static bool LINUX_JoystickInit(void)
     bool udev_initialized = SDL_UDEV_Init();
 #endif
 
+    SDL_LogDebug(SDL_LOG_CATEGORY_INPUT, "LINUX_JoystickInit: Starting joystick initialization");
+    SDL_LogDebug(SDL_LOG_CATEGORY_INPUT, "LINUX_JoystickInit: SDL_HINT_JOYSTICK_DEVICE = %s", devices ? devices : "NULL");
+
     SDL_classic_joysticks = SDL_GetHintBoolean(SDL_HINT_JOYSTICK_LINUX_CLASSIC, false);
+    SDL_LogDebug(SDL_LOG_CATEGORY_INPUT, "LINUX_JoystickInit: SDL_classic_joysticks = %s", SDL_classic_joysticks ? "true" : "false");
 
     enumeration_method = ENUMERATION_UNSET;
+
+    // List all input devices for debugging
+    LINUX_ListAllInputDevices();
 
     // First see if the user specified one or more joysticks to use
     if (devices) {
         char *envcopy, *envpath, *delim;
+        SDL_LogDebug(SDL_LOG_CATEGORY_INPUT, "LINUX_JoystickInit: Processing user-specified devices: %s", devices);
         envcopy = SDL_strdup(devices);
         envpath = envcopy;
         while (envpath) {
@@ -990,6 +1165,7 @@ static bool LINUX_JoystickInit(void)
             if (delim) {
                 *delim++ = '\0';
             }
+            SDL_LogDebug(SDL_LOG_CATEGORY_INPUT, "LINUX_JoystickInit: Adding user-specified device: %s", envpath);
             MaybeAddDevice(envpath);
             envpath = delim;
         }
@@ -1001,6 +1177,7 @@ static bool LINUX_JoystickInit(void)
     last_input_dir_mtime = 0;
 
     // Manually scan first, since we sort by device number and udev doesn't
+    SDL_LogDebug(SDL_LOG_CATEGORY_INPUT, "LINUX_JoystickInit: Performing initial joystick detection");
     LINUX_JoystickDetect();
 
 #ifdef SDL_USE_LIBUDEV
@@ -1023,13 +1200,16 @@ static bool LINUX_JoystickInit(void)
 
     if (enumeration_method == ENUMERATION_LIBUDEV) {
         if (udev_initialized) {
+            SDL_LogDebug(SDL_LOG_CATEGORY_INPUT, "LINUX_JoystickInit: udev initialized successfully");
             // Set up the udev callback
             if (!SDL_UDEV_AddCallback(joystick_udev_callback)) {
+                SDL_LogError(SDL_LOG_CATEGORY_INPUT, "LINUX_JoystickInit: Could not set up joystick <-> udev callback");
                 SDL_UDEV_Quit();
                 return SDL_SetError("Could not set up joystick <-> udev callback");
             }
 
             // Force a scan to build the initial device list
+            SDL_LogDebug(SDL_LOG_CATEGORY_INPUT, "LINUX_JoystickInit: Performing udev scan");
             SDL_UDEV_Scan();
         } else {
             SDL_LogDebug(SDL_LOG_CATEGORY_INPUT,
@@ -1045,6 +1225,7 @@ static bool LINUX_JoystickInit(void)
 
     if (enumeration_method != ENUMERATION_LIBUDEV) {
 #ifdef HAVE_INOTIFY
+        SDL_LogDebug(SDL_LOG_CATEGORY_INPUT, "LINUX_JoystickInit: Setting up inotify for device monitoring");
         inotify_fd = SDL_inotify_init1();
 
         if (inotify_fd < 0) {
@@ -1052,6 +1233,7 @@ static bool LINUX_JoystickInit(void)
                         "Unable to initialize inotify, falling back to polling: %s",
                         strerror(errno));
         } else {
+            SDL_LogDebug(SDL_LOG_CATEGORY_INPUT, "LINUX_JoystickInit: inotify initialized successfully");
             /* We need to watch for attribute changes in addition to
              * creation, because when a device is first created, it has
              * permissions that we can't read. When udev chmods it to
@@ -1064,18 +1246,21 @@ static bool LINUX_JoystickInit(void)
                 SDL_LogWarn(SDL_LOG_CATEGORY_INPUT,
                             "Unable to add inotify watch, falling back to polling: %s",
                             strerror(errno));
+            } else {
+                SDL_LogDebug(SDL_LOG_CATEGORY_INPUT, "LINUX_JoystickInit: inotify watch added successfully");
             }
         }
 #endif // HAVE_INOTIFY
     }
 
+    SDL_LogDebug(SDL_LOG_CATEGORY_INPUT, "LINUX_JoystickInit: Initialization complete, found %d joysticks", numjoysticks);
     return true;
 }
 
 static int LINUX_JoystickGetCount(void)
 {
     SDL_AssertJoysticksLocked();
-
+    SDL_LogDebug(SDL_LOG_CATEGORY_INPUT, "LINUX_JoystickGetCount: Returning %d joysticks", numjoysticks);
     return numjoysticks;
 }
 
@@ -1208,10 +1393,16 @@ static void ConfigJoystick(SDL_Joystick *joystick, int fd, int fd_sensor)
 
     SDL_AssertJoysticksLocked();
 
+    SDL_LogDebug(SDL_LOG_CATEGORY_INPUT, "ConfigJoystick: Configuring joystick (fd=%d, fd_sensor=%d)", fd, fd_sensor);
+    SDL_LogDebug(SDL_LOG_CATEGORY_INPUT, "ConfigJoystick: Deadzone settings - use_deadzones=%s, use_hat_deadzones=%s", 
+                use_deadzones ? "true" : "false", use_hat_deadzones ? "true" : "false");
+
     // See if this device uses the new unified event API
     if ((ioctl(fd, EVIOCGBIT(EV_KEY, sizeof(keybit)), keybit) >= 0) &&
         (ioctl(fd, EVIOCGBIT(EV_ABS, sizeof(absbit)), absbit) >= 0) &&
         (ioctl(fd, EVIOCGBIT(EV_REL, sizeof(relbit)), relbit) >= 0)) {
+
+        SDL_LogDebug(SDL_LOG_CATEGORY_INPUT, "ConfigJoystick: Using unified event API");
 
         // Get the number of buttons, axes, and other thingamajigs
         for (i = BTN_JOYSTICK; i < KEY_MAX; ++i) {
@@ -1234,6 +1425,9 @@ static void ConfigJoystick(SDL_Joystick *joystick, int fd, int fd_sensor)
                 ++joystick->nbuttons;
             }
         }
+        
+        SDL_LogDebug(SDL_LOG_CATEGORY_INPUT, "ConfigJoystick: Found %d buttons", joystick->nbuttons);
+
         for (i = ABS_HAT0X; i <= ABS_HAT3Y; i += 2) {
             int hat_x = -1;
             int hat_y = -1;
@@ -1270,8 +1464,12 @@ static void ConfigJoystick(SDL_Joystick *joystick, int fd, int fd_sensor)
                 correct->minimum[1] = (hat_y < 0) ? -1 : absinfo_y.minimum;
                 correct->maximum[1] = (hat_y < 0) ? 1 : absinfo_y.maximum;
                 ++joystick->nhats;
+                SDL_LogDebug(SDL_LOG_CATEGORY_INPUT, "ConfigJoystick: Found digital hat %d", hat_index);
             }
         }
+        
+        SDL_LogDebug(SDL_LOG_CATEGORY_INPUT, "ConfigJoystick: Found %d hats", joystick->nhats);
+
         for (i = 0; i < ABS_MAX; ++i) {
             // Skip digital hats
             if (i >= ABS_HAT0X && i <= ABS_HAT3Y && joystick->hwdata->has_hat[(i - ABS_HAT0X) / 2]) {
@@ -1314,15 +1512,22 @@ static void ConfigJoystick(SDL_Joystick *joystick, int fd, int fd_sensor)
                     }
                 }
                 ++joystick->naxes;
+                SDL_LogDebug(SDL_LOG_CATEGORY_INPUT, "ConfigJoystick: Found axis 0x%02x (mapped to %d)", i, joystick->naxes - 1);
             }
         }
+        
+        SDL_LogDebug(SDL_LOG_CATEGORY_INPUT, "ConfigJoystick: Found %d axes", joystick->naxes);
+
         if (test_bit(REL_X, relbit) || test_bit(REL_Y, relbit)) {
             ++joystick->nballs;
+            SDL_LogDebug(SDL_LOG_CATEGORY_INPUT, "ConfigJoystick: Found %d balls", joystick->nballs);
         }
 
     } else if ((ioctl(fd, JSIOCGBUTTONS, &key_pam_size, sizeof(key_pam_size)) >= 0) &&
                (ioctl(fd, JSIOCGAXES, &abs_pam_size, sizeof(abs_pam_size)) >= 0)) {
         size_t len;
+
+        SDL_LogDebug(SDL_LOG_CATEGORY_INPUT, "ConfigJoystick: Using classic joystick API (buttons=%d, axes=%d)", key_pam_size, abs_pam_size);
 
         joystick->hwdata->classic = true;
 
@@ -1388,12 +1593,16 @@ static void ConfigJoystick(SDL_Joystick *joystick, int fd, int fd_sensor)
 
     // Sensors are only available through the new unified event API
     if (fd_sensor >= 0 && (ioctl(fd_sensor, EVIOCGBIT(EV_ABS, sizeof(absbit)), absbit) >= 0)) {
+        SDL_LogDebug(SDL_LOG_CATEGORY_INPUT, "ConfigJoystick: Checking for sensors");
+        
         if (test_bit(ABS_X, absbit) && test_bit(ABS_Y, absbit) && test_bit(ABS_Z, absbit)) {
             joystick->hwdata->has_accelerometer = true;
+            SDL_LogDebug(SDL_LOG_CATEGORY_INPUT, "ConfigJoystick: Found accelerometer");
             for (i = 0; i < 3; ++i) {
                 struct input_absinfo absinfo;
                 if (ioctl(fd_sensor, EVIOCGABS(ABS_X + i), &absinfo) < 0) {
                     joystick->hwdata->has_accelerometer = false;
+                    SDL_LogDebug(SDL_LOG_CATEGORY_INPUT, "ConfigJoystick: Failed to read accelerometer axis %d", i);
                     break; // do not report an accelerometer if we can't read all axes
                 }
                 joystick->hwdata->accelerometer_scale[i] = absinfo.resolution;
@@ -1408,10 +1617,12 @@ static void ConfigJoystick(SDL_Joystick *joystick, int fd, int fd_sensor)
 
         if (test_bit(ABS_RX, absbit) && test_bit(ABS_RY, absbit) && test_bit(ABS_RZ, absbit)) {
             joystick->hwdata->has_gyro = true;
+            SDL_LogDebug(SDL_LOG_CATEGORY_INPUT, "ConfigJoystick: Found gyroscope");
             for (i = 0; i < 3; ++i) {
                 struct input_absinfo absinfo;
                 if (ioctl(fd_sensor, EVIOCGABS(ABS_RX + i), &absinfo) < 0) {
                     joystick->hwdata->has_gyro = false;
+                    SDL_LogDebug(SDL_LOG_CATEGORY_INPUT, "ConfigJoystick: Failed to read gyro axis %d", i);
                     break; // do not report a gyro if we can't read all axes
                 }
                 joystick->hwdata->gyro_scale[i] = absinfo.resolution;
@@ -1440,11 +1651,16 @@ static void ConfigJoystick(SDL_Joystick *joystick, int fd, int fd_sensor)
     if (ioctl(fd, EVIOCGBIT(EV_FF, sizeof(ffbit)), ffbit) >= 0) {
         if (test_bit(FF_RUMBLE, ffbit)) {
             joystick->hwdata->ff_rumble = true;
+            SDL_LogDebug(SDL_LOG_CATEGORY_INPUT, "ConfigJoystick: Device supports rumble force feedback");
         }
         if (test_bit(FF_SINE, ffbit)) {
             joystick->hwdata->ff_sine = true;
+            SDL_LogDebug(SDL_LOG_CATEGORY_INPUT, "ConfigJoystick: Device supports sine force feedback");
         }
     }
+
+    SDL_LogDebug(SDL_LOG_CATEGORY_INPUT, "ConfigJoystick: Configuration complete - buttons: %d, axes: %d, hats: %d, balls: %d", 
+                joystick->nbuttons, joystick->naxes, joystick->nhats, joystick->nballs);
 }
 
 /* This is used to do the heavy lifting for LINUX_JoystickOpen and
@@ -1562,19 +1778,30 @@ static bool LINUX_JoystickOpen(SDL_Joystick *joystick, int device_index)
 
     SDL_AssertJoysticksLocked();
 
+    SDL_LogDebug(SDL_LOG_CATEGORY_INPUT, "LINUX_JoystickOpen: Opening joystick at device index %d", device_index);
+
     item = GetJoystickByDevIndex(device_index);
     if (!item) {
+        SDL_LogError(SDL_LOG_CATEGORY_INPUT, "LINUX_JoystickOpen: No device found at index %d", device_index);
         return SDL_SetError("No such device");
     }
+
+    SDL_LogDebug(SDL_LOG_CATEGORY_INPUT, "LINUX_JoystickOpen: Opening device %s (%s)", item->path, item->name);
 
     joystick->hwdata = (struct joystick_hwdata *)
         SDL_calloc(1, sizeof(*joystick->hwdata));
     if (!joystick->hwdata) {
+        SDL_LogError(SDL_LOG_CATEGORY_INPUT, "LINUX_JoystickOpen: Failed to allocate hwdata");
         return false;
     }
 
     item_sensor = GetSensor(item);
+    if (item_sensor) {
+        SDL_LogDebug(SDL_LOG_CATEGORY_INPUT, "LINUX_JoystickOpen: Found associated sensor: %s", item_sensor->path);
+    }
+
     if (!PrepareJoystickHwdata(joystick, item, item_sensor)) {
+        SDL_LogError(SDL_LOG_CATEGORY_INPUT, "LINUX_JoystickOpen: Failed to prepare joystick hardware data");
         SDL_free(joystick->hwdata);
         joystick->hwdata = NULL;
         return false; // SDL_SetError will already have been called
@@ -1590,10 +1817,15 @@ static bool LINUX_JoystickOpen(SDL_Joystick *joystick, int device_index)
     // mark joystick as fresh and ready
     joystick->hwdata->fresh = true;
 
+    SDL_LogDebug(SDL_LOG_CATEGORY_INPUT, "LINUX_JoystickOpen: Joystick opened successfully - buttons: %d, axes: %d, hats: %d, balls: %d", 
+                joystick->nbuttons, joystick->naxes, joystick->nhats, joystick->nballs);
+
     if (joystick->hwdata->has_gyro) {
+        SDL_LogDebug(SDL_LOG_CATEGORY_INPUT, "LINUX_JoystickOpen: Joystick has gyroscope");
         SDL_PrivateJoystickAddSensor(joystick, SDL_SENSOR_GYRO, 0.0f);
     }
     if (joystick->hwdata->has_accelerometer) {
+        SDL_LogDebug(SDL_LOG_CATEGORY_INPUT, "LINUX_JoystickOpen: Joystick has accelerometer");
         SDL_PrivateJoystickAddSensor(joystick, SDL_SENSOR_ACCEL, 0.0f);
     }
     if (joystick->hwdata->fd_sensor >= 0) {
@@ -1603,6 +1835,7 @@ static bool LINUX_JoystickOpen(SDL_Joystick *joystick, int device_index)
     }
 
     if (joystick->hwdata->ff_rumble || joystick->hwdata->ff_sine) {
+        SDL_LogDebug(SDL_LOG_CATEGORY_INPUT, "LINUX_JoystickOpen: Joystick supports force feedback");
         SDL_SetBooleanProperty(SDL_GetJoystickProperties(joystick), SDL_PROP_JOYSTICK_CAP_RUMBLE_BOOLEAN, true);
     }
     return true;

@@ -643,12 +643,15 @@ bool SDL_InitJoysticks(void)
     int i;
     bool result = false;
 
+    SDL_LogDebug(SDL_LOG_CATEGORY_INPUT, "SDL_InitJoysticks: Starting joystick subsystem initialization");
+
     // Create the joystick list lock
     if (SDL_joystick_lock == NULL) {
         SDL_joystick_lock = SDL_CreateMutex();
     }
 
     if (!SDL_InitSubSystem(SDL_INIT_EVENTS)) {
+        SDL_LogError(SDL_LOG_CATEGORY_INPUT, "SDL_InitJoysticks: Failed to initialize events subsystem");
         return false;
     }
 
@@ -673,15 +676,77 @@ bool SDL_InitJoysticks(void)
 
     SDL_InitSteamVirtualGamepadInfo();
 
+    SDL_LogDebug(SDL_LOG_CATEGORY_INPUT, "SDL_InitJoysticks: Initializing %d joystick drivers", SDL_arraysize(SDL_joystick_drivers));
+
     for (i = 0; i < SDL_arraysize(SDL_joystick_drivers); ++i) {
+        const char *driver_name = "Unknown";
+#ifdef SDL_JOYSTICK_RAWINPUT
+        if (SDL_joystick_drivers[i] == &SDL_RAWINPUT_JoystickDriver) driver_name = "RAWINPUT";
+#endif
+#if defined(SDL_JOYSTICK_DINPUT) || defined(SDL_JOYSTICK_XINPUT)
+        if (SDL_joystick_drivers[i] == &SDL_WINDOWS_JoystickDriver) driver_name = "WINDOWS";
+#endif
+#ifdef SDL_JOYSTICK_WGI
+        if (SDL_joystick_drivers[i] == &SDL_WGI_JoystickDriver) driver_name = "WGI";
+#endif
+#ifdef SDL_JOYSTICK_WINMM
+        if (SDL_joystick_drivers[i] == &SDL_WINMM_JoystickDriver) driver_name = "WINMM";
+#endif
+#ifdef SDL_JOYSTICK_LINUX
+        if (SDL_joystick_drivers[i] == &SDL_LINUX_JoystickDriver) driver_name = "LINUX";
+#endif
+#ifdef SDL_JOYSTICK_IOKIT
+        if (SDL_joystick_drivers[i] == &SDL_DARWIN_JoystickDriver) driver_name = "DARWIN";
+#endif
+#if (defined(SDL_PLATFORM_MACOS) || defined(SDL_PLATFORM_IOS) || defined(SDL_PLATFORM_TVOS)) && !defined(SDL_JOYSTICK_DISABLED)
+        if (SDL_joystick_drivers[i] == &SDL_IOS_JoystickDriver) driver_name = "IOS";
+#endif
+#ifdef SDL_JOYSTICK_ANDROID
+        if (SDL_joystick_drivers[i] == &SDL_ANDROID_JoystickDriver) driver_name = "ANDROID";
+#endif
+#ifdef SDL_JOYSTICK_EMSCRIPTEN
+        if (SDL_joystick_drivers[i] == &SDL_EMSCRIPTEN_JoystickDriver) driver_name = "EMSCRIPTEN";
+#endif
+#ifdef SDL_JOYSTICK_HAIKU
+        if (SDL_joystick_drivers[i] == &SDL_HAIKU_JoystickDriver) driver_name = "HAIKU";
+#endif
+#ifdef SDL_JOYSTICK_USBHID
+        if (SDL_joystick_drivers[i] == &SDL_BSD_JoystickDriver) driver_name = "BSD";
+#endif
+#ifdef SDL_JOYSTICK_PS2
+        if (SDL_joystick_drivers[i] == &SDL_PS2_JoystickDriver) driver_name = "PS2";
+#endif
+#ifdef SDL_JOYSTICK_PSP
+        if (SDL_joystick_drivers[i] == &SDL_PSP_JoystickDriver) driver_name = "PSP";
+#endif
+#ifdef SDL_JOYSTICK_VIRTUAL
+        if (SDL_joystick_drivers[i] == &SDL_VIRTUAL_JoystickDriver) driver_name = "VIRTUAL";
+#endif
+#ifdef SDL_JOYSTICK_VITA
+        if (SDL_joystick_drivers[i] == &SDL_VITA_JoystickDriver) driver_name = "VITA";
+#endif
+#ifdef SDL_JOYSTICK_N3DS
+        if (SDL_joystick_drivers[i] == &SDL_N3DS_JoystickDriver) driver_name = "N3DS";
+#endif
+#if defined(SDL_JOYSTICK_DUMMY) || defined(SDL_JOYSTICK_DISABLED)
+        if (SDL_joystick_drivers[i] == &SDL_DUMMY_JoystickDriver) driver_name = "DUMMY";
+#endif
+
+        SDL_LogDebug(SDL_LOG_CATEGORY_INPUT, "SDL_InitJoysticks: Initializing driver %d (%s)", i, driver_name);
         if (SDL_joystick_drivers[i]->Init()) {
+            SDL_LogDebug(SDL_LOG_CATEGORY_INPUT, "SDL_InitJoysticks: Driver %d (%s) initialized successfully", i, driver_name);
             result = true;
+        } else {
+            SDL_LogDebug(SDL_LOG_CATEGORY_INPUT, "SDL_InitJoysticks: Driver %d (%s) failed to initialize", i, driver_name);
         }
     }
     SDL_UnlockJoysticks();
 
     if (!result) {
+        SDL_LogError(SDL_LOG_CATEGORY_INPUT, "SDL_InitJoysticks: No joystick drivers initialized successfully, quitting joysticks");
         SDL_QuitJoysticks();
+    } else {
+        SDL_LogDebug(SDL_LOG_CATEGORY_INPUT, "SDL_InitJoysticks: Joystick subsystem initialization complete");
     }
 
     return result;

@@ -62,6 +62,7 @@ private:
 
 	static JoypadSDL *singleton;
 
+
 	Joypad joypads[Input::JOYPADS_MAX];
 	HashMap<SDL_JoystickID, int> sdl_instance_id_to_joypad_id;
 

@@ -2660,13 +2660,18 @@ bool SDL_IsGamepad(SDL_JoystickID instance_id)
  */
 bool SDL_ShouldIgnoreGamepad(Uint16 vendor_id, Uint16 product_id, Uint16 version, const char *name)
 {
+    SDL_LogDebug(SDL_LOG_CATEGORY_INPUT, "SDL_ShouldIgnoreGamepad: Checking device - vendor: 0x%04x, product: 0x%04x, version: %d, name: %s", 
+                vendor_id, product_id, version, name ? name : "NULL");
+
 #ifdef SDL_PLATFORM_LINUX
     if (SDL_endswith(name, " Motion Sensors")) {
         // Don't treat the PS3 and PS4 motion controls as a separate gamepad
+        SDL_LogDebug(SDL_LOG_CATEGORY_INPUT, "SDL_ShouldIgnoreGamepad: Ignoring motion sensors device");
         return true;
     }
     if (SDL_strncmp(name, "Nintendo ", 9) == 0 && SDL_strstr(name, " IMU") != NULL) {
         // Don't treat the Nintendo IMU as a separate gamepad
+        SDL_LogDebug(SDL_LOG_CATEGORY_INPUT, "SDL_ShouldIgnoreGamepad: Ignoring Nintendo IMU device");
         return true;
     }
     if (SDL_endswith(name, " Accelerometer") ||
@@ -2674,12 +2679,14 @@ bool SDL_ShouldIgnoreGamepad(Uint16 vendor_id, Uint16 product_id, Uint16 version
         SDL_endswith(name, " Motion Plus") ||
         SDL_endswith(name, " Nunchuk")) {
         // Don't treat the Wii extension controls as a separate gamepad
+        SDL_LogDebug(SDL_LOG_CATEGORY_INPUT, "SDL_ShouldIgnoreGamepad: Ignoring Wii extension device");
         return true;
     }
 #endif
 
     if (name && SDL_strcmp(name, "uinput-fpc") == 0) {
         // The Google Pixel fingerprint sensor reports itself as a joystick
+        SDL_LogDebug(SDL_LOG_CATEGORY_INPUT, "SDL_ShouldIgnoreGamepad: Ignoring fingerprint sensor");
         return true;
     }
 
@@ -2690,23 +2697,31 @@ bool SDL_ShouldIgnoreGamepad(Uint16 vendor_id, Uint16 product_id, Uint16 version
         // We can't tell whether this controller is a Steam Virtual Gamepad,
         // so assume that Proton is doing the appropriate filtering of controllers
         // and anything we see here is fine to use.
+        SDL_LogDebug(SDL_LOG_CATEGORY_INPUT, "SDL_ShouldIgnoreGamepad: Proton mode - allowing device");
         return false;
     }
 #endif // SDL_PLATFORM_WIN32
 
     if (SDL_IsJoystickSteamVirtualGamepad(vendor_id, product_id, version)) {
-        return !SDL_GetHintBoolean("SDL_GAMECONTROLLER_ALLOW_STEAM_VIRTUAL_GAMEPAD", false);
+        bool allow_steam_virtual = SDL_GetHintBoolean("SDL_GAMECONTROLLER_ALLOW_STEAM_VIRTUAL_GAMEPAD", false);
+        SDL_LogDebug(SDL_LOG_CATEGORY_INPUT, "SDL_ShouldIgnoreGamepad: Steam virtual gamepad detected, allow_steam_virtual=%s", 
+                    allow_steam_virtual ? "true" : "false");
+        return !allow_steam_virtual;
     }
 
     if (SDL_allowed_gamepads.num_included_entries > 0) {
         if (SDL_VIDPIDInList(vendor_id, product_id, &SDL_allowed_gamepads)) {
+            SDL_LogDebug(SDL_LOG_CATEGORY_INPUT, "SDL_ShouldIgnoreGamepad: Device in allowed list");
             return false;
         }
+        SDL_LogDebug(SDL_LOG_CATEGORY_INPUT, "SDL_ShouldIgnoreGamepad: Device not in allowed list");
         return true;
     } else {
         if (SDL_VIDPIDInList(vendor_id, product_id, &SDL_ignored_gamepads)) {
+            SDL_LogDebug(SDL_LOG_CATEGORY_INPUT, "SDL_ShouldIgnoreGamepad: Device in ignored list");
             return true;
         }
+        SDL_LogDebug(SDL_LOG_CATEGORY_INPUT, "SDL_ShouldIgnoreGamepad: Device not in ignored list, allowing");
         return false;
     }
 }

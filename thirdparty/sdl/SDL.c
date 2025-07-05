@@ -391,51 +391,68 @@ bool SDL_InitSubSystem(SDL_InitFlags flags)
 
     // Initialize the joystick subsystem
     if (flags & SDL_INIT_JOYSTICK) {
+        SDL_LogDebug(SDL_LOG_CATEGORY_INPUT, "SDL_Init: Initializing joystick subsystem");
 #ifndef SDL_JOYSTICK_DISABLED
         if (SDL_ShouldInitSubsystem(SDL_INIT_JOYSTICK)) {
+            SDL_LogDebug(SDL_LOG_CATEGORY_INPUT, "SDL_Init: Should initialize joystick subsystem");
             // joystick implies events
             if (!SDL_InitOrIncrementSubsystem(SDL_INIT_EVENTS)) {
+                SDL_LogError(SDL_LOG_CATEGORY_INPUT, "SDL_Init: Failed to initialize events subsystem for joysticks");
                 goto quit_and_error;
             }
 
             SDL_IncrementSubsystemRefCount(SDL_INIT_JOYSTICK);
+            SDL_LogDebug(SDL_LOG_CATEGORY_INPUT, "SDL_Init: Calling SDL_InitJoysticks()");
             if (!SDL_InitJoysticks()) {
+                SDL_LogError(SDL_LOG_CATEGORY_INPUT, "SDL_Init: SDL_InitJoysticks() failed");
                 SDL_DecrementSubsystemRefCount(SDL_INIT_JOYSTICK);
                 SDL_PushError();
                 SDL_QuitSubSystem(SDL_INIT_EVENTS);
                 SDL_PopError();
                 goto quit_and_error;
             }
+            SDL_LogDebug(SDL_LOG_CATEGORY_INPUT, "SDL_Init: SDL_InitJoysticks() succeeded");
         } else {
+            SDL_LogDebug(SDL_LOG_CATEGORY_INPUT, "SDL_Init: Joystick subsystem already initialized, incrementing ref count");
             SDL_IncrementSubsystemRefCount(SDL_INIT_JOYSTICK);
         }
         flags_initialized |= SDL_INIT_JOYSTICK;
+        SDL_LogDebug(SDL_LOG_CATEGORY_INPUT, "SDL_Init: Joystick subsystem initialization complete");
 #else
+        SDL_LogError(SDL_LOG_CATEGORY_INPUT, "SDL_Init: SDL not built with joystick support");
         SDL_SetError("SDL not built with joystick support");
         goto quit_and_error;
 #endif
     }
 
     if (flags & SDL_INIT_GAMEPAD) {
+        SDL_LogDebug(SDL_LOG_CATEGORY_INPUT, "SDL_Init: Initializing gamepad subsystem");
 #ifndef SDL_JOYSTICK_DISABLED
         if (SDL_ShouldInitSubsystem(SDL_INIT_GAMEPAD)) {
+            SDL_LogDebug(SDL_LOG_CATEGORY_INPUT, "SDL_Init: Should initialize gamepad subsystem");
             // game controller implies joystick
             if (!SDL_InitOrIncrementSubsystem(SDL_INIT_JOYSTICK)) {
+                SDL_LogError(SDL_LOG_CATEGORY_INPUT, "SDL_Init: Failed to initialize joystick subsystem for gamepads");
                 goto quit_and_error;
             }
 
             SDL_IncrementSubsystemRefCount(SDL_INIT_GAMEPAD);
+            SDL_LogDebug(SDL_LOG_CATEGORY_INPUT, "SDL_Init: Calling SDL_InitGamepads()");
             if (!SDL_InitGamepads()) {
+                SDL_LogError(SDL_LOG_CATEGORY_INPUT, "SDL_Init: SDL_InitGamepads() failed");
                 SDL_DecrementSubsystemRefCount(SDL_INIT_GAMEPAD);
                 SDL_PushError();
                 SDL_QuitSubSystem(SDL_INIT_JOYSTICK);
                 SDL_PopError();
                 goto quit_and_error;
             }
+            SDL_LogDebug(SDL_LOG_CATEGORY_INPUT, "SDL_Init: SDL_InitGamepads() succeeded");
         } else {
+            SDL_LogDebug(SDL_LOG_CATEGORY_INPUT, "SDL_Init: Gamepad subsystem already initialized, incrementing ref count");
             SDL_IncrementSubsystemRefCount(SDL_INIT_GAMEPAD);
         }
         flags_initialized |= SDL_INIT_GAMEPAD;
+        SDL_LogDebug(SDL_LOG_CATEGORY_INPUT, "SDL_Init: Gamepad subsystem initialization complete");
 #else
         SDL_SetError("SDL not built with joystick support");
         goto quit_and_error;
