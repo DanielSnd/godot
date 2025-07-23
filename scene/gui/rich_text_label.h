@@ -234,12 +234,41 @@ private:
 		Size2 max_size_over = Size2(-1, -1);
 		Rect2 padding;
 		int indent_level = 0;
+		bool has_image_background = false;
 
 		ItemFrame() {
 			type = ITEM_FRAME;
 			first_invalid_line.store(0);
 			first_invalid_font_line.store(0);
 			first_resized_line.store(0);
+		}
+	};
+
+	struct ItemFrameImageBackground : public ItemFrame {
+		Ref<Texture2D> image;
+		bool width_in_percent = false;
+		bool height_in_percent = false;
+		Rect2 region;
+		Size2 size;
+		Size2 rq_size;
+		Variant key;
+		ItemFrameImageBackground() {
+			type = ITEM_FRAME;
+			has_image_background = true;
+			first_invalid_line.store(0);
+			first_invalid_font_line.store(0);
+			first_resized_line.store(0);
+		}
+		~ItemFrameImageBackground() {
+			if (image.is_valid()) {
+				RichTextLabel *owner_rtl = ObjectDB::get_instance<RichTextLabel>(owner);
+				if (owner_rtl) {
+					if (owner_rtl->hr_list.has(rid)) {
+						owner_rtl->hr_list.erase((rid));
+					}
+					image->disconnect_changed(callable_mp(owner_rtl, &RichTextLabel::_texture_changed));
+				}
+			}
 		}
 	};
 
@@ -819,6 +848,7 @@ public:
 	void set_table_column_name(int p_column, const String &p_name);
 	void set_cell_row_background_color(const Color &p_odd_row_bg, const Color &p_even_row_bg);
 	void set_cell_border_color(const Color &p_color);
+	void push_cell_with_image_background(const Ref<Texture2D> &p_image, const Rect2 &p_region, const Variant &p_key, bool p_width_in_percent, bool p_height_in_percent);
 	void set_cell_size_override(const Size2 &p_min_size, const Size2 &p_max_size);
 	void set_cell_padding(const Rect2 &p_padding);
 	int get_current_table_column() const;
