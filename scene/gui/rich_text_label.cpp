@@ -638,6 +638,15 @@ float RichTextLabel::_shape_line(ItemFrame *p_frame, int p_line, const Ref<Font>
 						t_char_count += cell_ch;
 						remaining_characters -= cell_ch;
 
+						int min_width_override = frame->min_size_over.x;
+						int max_width_override = frame->max_size_over.x;
+						if (min_width_override > 0) {
+							table->columns[column].min_width = MIN(min_width_override,table->columns[column].min_width);
+						}
+						if (max_width_override > 0) {
+							table->columns[column].max_width = MAX(max_width_override,table->columns[column].max_width);
+						}
+
 						table->columns[column].min_width = MAX(table->columns[column].min_width, frame->lines[i].indent + std::ceil(frame->lines[i].text_buf->get_size().x));
 						table->columns[column].max_width = MAX(table->columns[column].max_width, frame->lines[i].indent + std::ceil(frame->lines[i].text_buf->get_non_wrapped_size().x));
 					}
@@ -1024,15 +1033,24 @@ int RichTextLabel::_draw_line(ItemFrame *p_frame, int p_line, const Vector2 &p_o
 										if (rtl) {
 											coff.x = rect.size.width - table->columns[col].width - coff.x;
 										}
-										if (row % 2 == 0) {
-											Color c = frame->odd_row_bg != Color(0, 0, 0, 0) ? frame->odd_row_bg : odd_row_bg;
-											if (c.a > 0.0) {
-												draw_rect(Rect2(p_ofs + rect.position + off + coff - frame->padding.position - Vector2(h_separation * 0.5, v_separation * 0.5).floor(), Size2(table->columns[col].width + h_separation + frame->padding.position.x + frame->padding.size.x, table->rows_no_padding[row] + frame->padding.position.y + frame->padding.size.y)), c, true);
+										if (frame->has_image_background) {
+											ItemFrameImageBackground *img_bg = static_cast<ItemFrameImageBackground *>(frame);
+											Color img_bg_color = row % 2 == 0 ? (frame->odd_row_bg != Color(0, 0, 0, 0) ? frame->odd_row_bg : odd_row_bg) : (frame->even_row_bg != Color(0, 0, 0, 0) ? frame->even_row_bg : even_row_bg);
+											if (img_bg != nullptr && img_bg->image.is_valid()) {
+												img_bg->image->draw_rect(ci, Rect2(p_ofs + rect.position + off + coff - frame->padding.position - Vector2(h_separation * 0.5, v_separation * 0.5).floor(), Size2(table->columns[col].width + h_separation + frame->padding.position.x + frame->padding.size.x, table->rows_no_padding[row] + frame->padding.position.y + frame->padding.size.y)), false, img_bg_color);
+												// visible_rect = _merge_or_copy_rect(visible_rect, Rect2(p_ofs + rect.position + off, rect.size));
 											}
 										} else {
-											Color c = frame->even_row_bg != Color(0, 0, 0, 0) ? frame->even_row_bg : even_row_bg;
-											if (c.a > 0.0) {
-												draw_rect(Rect2(p_ofs + rect.position + off + coff - frame->padding.position - Vector2(h_separation * 0.5, v_separation * 0.5).floor(), Size2(table->columns[col].width + h_separation + frame->padding.position.x + frame->padding.size.x, table->rows_no_padding[row] + frame->padding.position.y + frame->padding.size.y)), c, true);
+											if (row % 2 == 0) {
+												Color c = frame->odd_row_bg != Color(0, 0, 0, 0) ? frame->odd_row_bg : odd_row_bg;
+												if (c.a > 0.0) {
+													draw_rect(Rect2(p_ofs + rect.position + off + coff - frame->padding.position - Vector2(h_separation * 0.5, v_separation * 0.5).floor(), Size2(table->columns[col].width + h_separation + frame->padding.position.x + frame->padding.size.x, table->rows_no_padding[row] + frame->padding.position.y + frame->padding.size.y)), c, true);
+												}
+											} else {
+												Color c = frame->even_row_bg != Color(0, 0, 0, 0) ? frame->even_row_bg : even_row_bg;
+												if (c.a > 0.0) {
+													draw_rect(Rect2(p_ofs + rect.position + off + coff - frame->padding.position - Vector2(h_separation * 0.5, v_separation * 0.5).floor(), Size2(table->columns[col].width + h_separation + frame->padding.position.x + frame->padding.size.x, table->rows_no_padding[row] + frame->padding.position.y + frame->padding.size.y)), c, true);
+												}
 											}
 										}
 										Color bc = frame->border != Color(0, 0, 0, 0) ? frame->border : border;
@@ -4830,6 +4848,46 @@ void RichTextLabel::set_cell_border_color(const Color &p_color) {
 	cell->border = p_color;
 }
 
+void RichTextLabel::push_cell_with_image_background(const Ref<Texture2D> &p_image, const Rect2 &p_region, const Variant &p_key, bool p_width_in_percent, bool p_height_in_percent) {
+	_stop_thread();
+	MutexLock data_lock(data_mutex);
+
+	ERR_FAIL_COND(current->type != ITEM_TABLE);
+
+	ERR_FAIL_COND(p_image.is_null());
+	ERR_FAIL_COND(p_image->get_width() == 0);
+	ERR_FAIL_COND(p_image->get_height() == 0);
+
+	ItemFrameImageBackground *item = memnew(ItemFrameImageBackground);
+	item->owner = get_instance_id();
+	item->rid = items.make_rid(item);
+	item->parent_frame = current_frame;
+	_add_item(item, true);
+	current_frame = item;
+
+	if (p_region.has_area()) {
+		Ref<AtlasTexture> atlas_tex = memnew(AtlasTexture);
+		atlas_tex->set_atlas(p_image);
+		atlas_tex->set_region(p_region);
+		item->image = atlas_tex;
+	} else {
+		item->image = p_image;
+	}
+	item->rq_size = Size2(p_image->get_width(), p_image->get_height());
+	item->region = p_region;
+	item->size = _get_image_size(p_image, 0, 0, p_region);
+	item->width_in_percent = p_width_in_percent;
+	item->height_in_percent = p_height_in_percent;
+	item->key = p_key;
+	item->odd_row_bg = Color(1, 1, 1, 1);
+	item->even_row_bg = Color(1, 1, 1, 1);
+	item->cell = true;
+	item->lines.resize(1);
+	item->lines[0].from = nullptr;
+	item->first_invalid_line.store(0); // parent frame last line ???
+	queue_accessibility_update();
+}
+
 void RichTextLabel::set_cell_size_override(const Size2 &p_min_size, const Size2 &p_max_size) {
 	_stop_thread();
 	MutexLock data_lock(data_mutex);
@@ -5396,7 +5454,28 @@ void RichTextLabel::append_text(const String &p_bbcode) {
 				set_table_column_expand(get_current_table_column(), true, ratio, shrink);
 			}
 
-			push_cell();
+			OptionMap::Iterator img_bg_option = bbcode_options.find("imgbg");
+			if (img_bg_option) {
+				Ref<Texture2D> texture = ResourceLoader::load(img_bg_option->value, "Texture2D");
+				if (texture.is_valid()) {
+					Rect2 region;
+					OptionMap::Iterator region_option = bbcode_options.find("imgregion");
+					if (region_option) {
+						Vector<String> region_values = _split_unquoted(region_option->value, U',');
+						if (region_values.size() == 4) {
+							region.position.x = region_values[0].to_float();
+							region.position.y = region_values[1].to_float();
+							region.size.x = region_values[2].to_float();
+							region.size.y = region_values[3].to_float();
+						}
+					}
+					push_cell_with_image_background(texture, region, Variant(), false, false);
+				} else {
+					push_cell();
+				}
+			} else {
+				push_cell();
+			}
 			const Color fallback_color = Color(0, 0, 0, 0);
 
 			OptionMap::Iterator border_option = bbcode_options.find("border");
@@ -5426,6 +5505,16 @@ void RichTextLabel::append_text(const String &p_bbcode) {
 
 				if (subtag_b.size() == 4) {
 					set_cell_padding(Rect2(subtag_b[0].to_float(), subtag_b[1].to_float(), subtag_b[2].to_float(), subtag_b[3].to_float()));
+				}
+			}
+
+			OptionMap::Iterator size_override_option = bbcode_options.find("size");
+			if (size_override_option) {
+				Vector<String> subtag_b = _split_unquoted(size_override_option->value, U',');
+				_normalize_subtags(subtag_b);
+
+				if (subtag_b.size() == 4) {
+					set_cell_size_override(Size2(subtag_b[0].to_float(), subtag_b[1].to_float()), Size2(subtag_b[2].to_float(), subtag_b[3].to_float()));
 				}
 			}
 
