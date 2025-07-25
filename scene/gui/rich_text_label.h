@@ -233,8 +233,12 @@ private:
 		Size2 min_size_over = Size2(-1, -1);
 		Size2 max_size_over = Size2(-1, -1);
 		Rect2 padding;
+		Rect2 margins;
+		Variant meta;
 		int indent_level = 0;
+		bool has_meta = false;
 		bool has_image_background = false;
+		bool vertical_align_center = false;
 
 		ItemFrame() {
 			type = ITEM_FRAME;
@@ -248,9 +252,12 @@ private:
 		Ref<Texture2D> image;
 		bool width_in_percent = false;
 		bool height_in_percent = false;
+		bool has_rect_offset = false;
+		bool keep_aspect_center = false;
 		Rect2 region;
 		Size2 size;
 		Size2 rq_size;
+		Rect2 rect_offset;
 		Variant key;
 		ItemFrameImageBackground() {
 			type = ITEM_FRAME;
@@ -846,11 +853,16 @@ public:
 	void push_context();
 	void set_table_column_expand(int p_column, bool p_expand, int p_ratio = 1, bool p_shrink = true);
 	void set_table_column_name(int p_column, const String &p_name);
+	void set_cell_meta(const Variant &p_meta);
 	void set_cell_row_background_color(const Color &p_odd_row_bg, const Color &p_even_row_bg);
 	void set_cell_border_color(const Color &p_color);
+	void set_cell_vertical_align_center(bool p_vertical_align_center);
 	void push_cell_with_image_background(const Ref<Texture2D> &p_image, const Rect2 &p_region, const Variant &p_key, bool p_width_in_percent, bool p_height_in_percent);
 	void set_cell_size_override(const Size2 &p_min_size, const Size2 &p_max_size);
 	void set_cell_padding(const Rect2 &p_padding);
+	void set_cell_margins(const Rect2 &p_margins);
+	void set_cell_bg_image_offset(const Rect2 &p_img_offset);
+	void set_cell_bg_image_keep_aspect_center(bool p_keep_aspect_center);
 	int get_current_table_column() const;
 	void push_cell();
 	void pop();
