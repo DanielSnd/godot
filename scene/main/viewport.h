@@ -387,6 +387,9 @@ private:
 		Point2 tooltip_pos;
 		Point2 last_mouse_pos;
 		Point2 drag_accum;
+		float minimum_interval_between_focus_changes_with_joystick;
+		bool can_change_focus_with_joystick = true;
+		Ref<SceneTreeTimer> focus_change_joystick_timer;
 		bool drag_attempted = false;
 		Variant drag_data; // Only used in root-Viewport and SubViewports, that are not children of a SubViewportContainer.
 		ObjectID drag_preview_id;
@@ -446,6 +449,8 @@ private:
 	void _gui_cancel_tooltip();
 	void _gui_show_tooltip();
 	void _gui_show_tooltip_at(const Point2i &p_pos);
+
+	void _gui_can_change_focus_with_joystick();
 
 	void _gui_remove_control(Control *p_control, PlayerId p_player_id = PlayerId::P1);
 	void _gui_hide_control(Control *p_control, PlayerId p_player_id = PlayerId::P1);

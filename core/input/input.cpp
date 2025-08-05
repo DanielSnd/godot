@@ -1981,6 +1981,7 @@ Input::Input() {
 	}
 
 	legacy_just_pressed_behavior = GLOBAL_DEF("input_devices/compatibility/legacy_just_pressed_behavior", false);
+	minimum_interval_between_focus_changes_with_joystick = GLOBAL_DEF("input_devices/buffering/minimum_interval_focusing_with_joystick", 0.2);
 	if (Engine::get_singleton()->is_editor_hint()) {
 		// Always use standard behavior in the editor.
 		legacy_just_pressed_behavior = false;

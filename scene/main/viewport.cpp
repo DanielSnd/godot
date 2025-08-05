@@ -2337,6 +2337,20 @@ void Viewport::_gui_input_event(Ref<InputEvent> p_event) {
 				if (p_event->is_action_pressed(SNAME("ui_down"), false, false, player_id) && input->is_action_just_pressed(SNAME("ui_down"), false, player_id)) {
 					next = from->_get_focus_neighbor(SIDE_BOTTOM, 0, player_id);
 				}
+
+				if (next != nullptr) {
+					if (gui.can_change_focus_with_joystick) {
+						gui.can_change_focus_with_joystick = false;
+						if (gui.focus_change_joystick_timer.is_valid()) {
+							gui.focus_change_joystick_timer->release_connections();
+						}
+						gui.focus_change_joystick_timer = get_tree()->create_timer(gui.minimum_interval_between_focus_changes_with_joystick);
+						gui.focus_change_joystick_timer->set_ignore_time_scale(true);
+						gui.focus_change_joystick_timer->connect("timeout", callable_mp(this, &Viewport::_gui_can_change_focus_with_joystick));
+					} else {
+						next = nullptr;
+					}
+				}
 			} else {
 				if (p_event->is_action_pressed(SNAME("ui_focus_next"), true, true, player_id)) {
 					next = from->find_next_valid_focus(player_id);
@@ -2436,6 +2450,10 @@ void Viewport::_gui_force_drag_start() {
 void Viewport::_gui_force_drag_cancel() {
 	Viewport *section_root = get_section_root_viewport();
 	section_root->gui.global_dragging = false;
+}
+
+void Viewport::_gui_can_change_focus_with_joystick() {
+	gui.can_change_focus_with_joystick = true;
 }
 
 void Viewport::_gui_force_drag(Control *p_base, const Variant &p_data, Control *p_control) {
@@ -5359,6 +5377,7 @@ Viewport::Viewport() {
 
 	// Window tooltip.
 	gui.tooltip_delay = GLOBAL_GET("gui/timers/tooltip_delay_sec");
+	gui.minimum_interval_between_focus_changes_with_joystick = GLOBAL_GET("input_devices/buffering/minimum_interval_focusing_with_joystick");
 
 #ifndef _3D_DISABLED
 	set_scaling_3d_mode((Viewport::Scaling3DMode)(int)GLOBAL_GET("rendering/scaling_3d/mode"));
