@@ -80,7 +80,7 @@ public:
 
 class GDScriptCache {
 	// String key is full path.
-	HashMap<String, GDScriptParserRef *> parser_map;
+	HashMap<String, Ref<GDScriptParserRef>> parser_map;
 	HashMap<String, Vector<ObjectID>> abandoned_parser_map;
 	HashMap<String, Ref<GDScript>> shallow_gdscript_cache;
 	HashMap<String, Ref<GDScript>> full_gdscript_cache;

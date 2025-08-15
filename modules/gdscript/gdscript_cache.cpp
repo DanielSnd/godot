@@ -138,7 +138,7 @@ GDScriptParserRef::~GDScriptParserRef() {
 
 	if (!abandoned) {
 		MutexLock lock(GDScriptCache::singleton->mutex);
-		GDScriptCache::singleton->parser_map.erase(path);
+		// GDScriptCache::singleton->parser_map.erase(path);
 	}
 }
 
@@ -246,7 +246,7 @@ void GDScriptCache::remove_parser(const String &p_path) {
 	MutexLock lock(singleton->mutex);
 
 	if (singleton->parser_map.has(p_path)) {
-		GDScriptParserRef *parser_ref = singleton->parser_map[p_path];
+		Ref<GDScriptParserRef> parser_ref = singleton->parser_map[p_path];
 		parser_ref->abandoned = true;
 		singleton->abandoned_parser_map[p_path].push_back(parser_ref->get_instance_id());
 	}
@@ -470,7 +470,7 @@ void GDScriptCache::clear() {
 	singleton->abandoned_parser_map.clear();
 
 	RBSet<Ref<GDScriptParserRef>> parser_map_refs;
-	for (KeyValue<String, GDScriptParserRef *> &E : singleton->parser_map) {
+	for (KeyValue<String, Ref<GDScriptParserRef>> &E : singleton->parser_map) {
 		parser_map_refs.insert(E.value);
 	}
 
