@@ -345,4 +345,5 @@ Validate extension JSON: JSON file: Field was added in a way that breaks compati
 Validate extension JSON: JSON file: Field was added in a way that breaks compatibility 'classes/Viewport/methods/gui_get_focus_owner': arguments
 Validate extension JSON: JSON file: Field was added in a way that breaks compatibility 'classes/Viewport/methods/gui_release_focus': arguments
 
+Return type changed to allow returning both ImageTexture and DPITexture. Compatibility method registered.
 Optional argument added. Compatibility method registered.
