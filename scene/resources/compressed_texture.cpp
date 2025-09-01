@@ -33,6 +33,7 @@
 #include "core/io/file_access.h"
 #include "core/io/resource_loader.h"
 #include "core/object/class_db.h"
+#include "core/os/thread.h"
 #include "scene/resources/bit_map.h"
 #include "servers/rendering/rendering_server.h"
 
@@ -191,8 +192,10 @@ Error CompressedTexture2D::load(const String &p_path) {
 	}
 
 #endif
-	notify_property_list_changed();
-	emit_changed();
+	if (!ResourceLoader::is_within_load() || Thread::is_main_thread()) {
+		notify_property_list_changed();
+		emit_changed();
+	}
 	return OK;
 }
 
@@ -552,8 +555,10 @@ Error CompressedTexture3D::load(const String &p_path) {
 		RenderingServer::get_singleton()->texture_set_path(texture, p_path);
 	}
 
-	notify_property_list_changed();
-	emit_changed();
+	if (!ResourceLoader::is_within_load() || Thread::is_main_thread()) {
+		notify_property_list_changed();
+		emit_changed();
+	}
 	return OK;
 }
 
@@ -707,8 +712,10 @@ Error CompressedTextureLayered::load(const String &p_path) {
 		RenderingServer::get_singleton()->texture_set_path(texture, p_path);
 	}
 
-	notify_property_list_changed();
-	emit_changed();
+	if (!ResourceLoader::is_within_load() || Thread::is_main_thread()) {
+		notify_property_list_changed();
+		emit_changed();
+	}
 	return OK;
 }
 
