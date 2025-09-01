@@ -614,7 +614,10 @@ void ResourceLoader::_run_load_task(void *p_userdata) {
 			load_task.resource->set_last_modified_time(mt);
 		}
 #endif
-
+		
+		if (load_task.load_token != nullptr && load_task.load_token->has_callback && load_task.load_token->callback.is_valid()) {
+			MessageQueue::get_main_singleton()->push_callable(load_task.load_token->callback);
+		}
 		if (_loaded_callback) {
 			_loaded_callback(load_task.resource, load_task.local_path);
 		}
@@ -628,6 +631,9 @@ void ResourceLoader::_run_load_task(void *p_userdata) {
 			thread_load_mutex.unlock();
 			thread_load_mutex_held = false;
 
+			if (load_task.load_token != nullptr && load_task.load_token->has_callback && load_task.load_token->callback.is_valid()) {
+				MessageQueue::get_main_singleton()->push_callable(load_task.load_token->callback);
+			}
 			if (_loaded_callback) {
 				_loaded_callback(load_task.resource, load_task.local_path);
 			}
@@ -702,6 +708,16 @@ Error ResourceLoader::load_threaded_request(const String &p_path, const String &
 	return token.is_valid() ? OK : FAILED;
 }
 
+Error ResourceLoader::load_threaded_request_with_callback(const String &p_path, Callable p_callback, const String &p_type_hint, bool p_use_sub_threads, ResourceFormatLoader::CacheMode p_cache_mode) {
+	Ref<ResourceLoader::LoadToken> token = _load_start(p_path, p_type_hint, p_use_sub_threads ? LOAD_THREAD_DISTRIBUTE : LOAD_THREAD_SPAWN_SINGLE, p_cache_mode, true);
+	if (token.is_valid()){
+		token->callback = p_callback;
+		token->has_callback = true;
+		return OK;
+	}
+	return FAILED;
+}
+
 ResourceLoader::LoadToken *ResourceLoader::_load_threaded_request_reuse_user_token(const String &p_path) {
 	HashMap<String, LoadToken *>::Iterator E = user_load_tokens.find(p_path);
 	if (E) {
@@ -758,6 +774,11 @@ Ref<ResourceLoader::LoadToken> ResourceLoader::_load_start(const String &p_path,
 	ThreadLoadTask *load_task_ptr = nullptr;
 	{
 		MutexLock thread_load_lock(thread_load_mutex);
+
+		if (cleaning_tasks) {
+			print_verbose(vformat("Refusing resource load for '%s' while thread load tasks are being cleaned up.", local_path));
+			return Ref<LoadToken>();
+		}
 
 		if (p_for_user) {
 			LoadToken *existing_token = _load_threaded_request_reuse_user_token(p_path);
@@ -966,8 +987,24 @@ Ref<Resource> ResourceLoader::load_threaded_get(const String &p_path, Error *r_e
 
 				load_task_ptr = &thread_load_tasks[load_token->local_path];
 			}
+			ThreadLoadStatus current_status = THREAD_LOAD_IN_PROGRESS;
+			// Check if the task still exists and get its current status
+			const int MAX_WAIT_ITERATIONS = 50000; // Prevent infinite loops
+			int wait_count = 0;
+			
+			bool should_continue = true;
 
-			while (load_task_ptr->status == THREAD_LOAD_IN_PROGRESS) {
+			while (should_continue && wait_count < MAX_WAIT_ITERATIONS) {
+				// Check current status
+				ThreadLoadStatus current_status = THREAD_LOAD_LOADED; // Assume completed if task missing
+				if (thread_load_tasks.has(load_token->local_path)) {
+					current_status = thread_load_tasks[load_token->local_path].status;
+				}
+				
+				if (current_status != THREAD_LOAD_IN_PROGRESS) {
+					break;
+				}
+
 				thread_load_lock.temp_unlock();
 				bool exit = !_ensure_load_progress();
 				OS::get_singleton()->delay_usec(1000);
@@ -976,9 +1013,13 @@ Ref<Resource> ResourceLoader::load_threaded_get(const String &p_path, Error *r_e
 				}
 
 				thread_load_lock.temp_relock();
-				if (exit) {
-					break;
-				}
+				
+				should_continue = !exit;
+				wait_count++;
+			}
+			
+			if (wait_count >= MAX_WAIT_ITERATIONS) {
+				ERR_PRINT("ResourceLoader: Timeout waiting for threaded load of: " + load_token->local_path);
 			}
 		}
 
@@ -1116,6 +1157,9 @@ Ref<Resource> ResourceLoader::_load_complete_inner(LoadToken &p_load_token, Erro
 				DEV_ASSERT(load_task_ptr->parent_task != load_task_ptr);
 				for (const ThreadLoadTask::ResourceChangedConnection &rcc : load_task_ptr->resource_changed_connections) {
 					load_task_ptr->parent_task->resource_changed_connections.push_back(rcc);
+				}
+				for (const Ref<Resource> &dependency : load_task_ptr->resource_dependencies) {
+					load_task_ptr->parent_task->resource_dependencies.push_back(dependency);
 				}
 				load_task_ptr->connections_propagated = true;
 			}
