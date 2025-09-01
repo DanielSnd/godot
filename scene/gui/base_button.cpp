@@ -202,7 +202,7 @@ void BaseButton::_toggled(bool p_pressed) {
 
 void BaseButton::on_action_event(Ref<InputEvent> p_event) {
 	Ref<InputEventMouseButton> mouse_button = p_event;
-
+	Ref<InputEventJoypadButton> joypad_button = p_event;
 	if (p_event->is_pressed() && (mouse_button.is_null() || status.hovering)) {
 		status.press_attempt = true;
 		status.pressing_inside = true;
@@ -222,6 +222,8 @@ void BaseButton::on_action_event(Ref<InputEvent> p_event) {
 				}
 				status.pressed = !status.pressed;
 				_unpress_group();
+				last_pressed_by_device = p_event->get_device() + (joypad_button.is_null() ? -1 : 0);
+				
 				if (button_group.is_valid()) {
 					button_group->emit_signal(SceneStringName(pressed), this);
 				}
@@ -231,6 +233,7 @@ void BaseButton::on_action_event(Ref<InputEvent> p_event) {
 			}
 		} else {
 			if ((p_event->is_pressed() && action_mode == ACTION_MODE_BUTTON_PRESS) || (!p_event->is_pressed() && action_mode == ACTION_MODE_BUTTON_RELEASE)) {
+				last_pressed_by_device = p_event->get_device() + (joypad_button.is_null() ? -1 : 0);
 				_pressed();
 			}
 		}
@@ -291,6 +294,7 @@ void BaseButton::set_pressed(bool p_pressed) {
 	if (p_pressed) {
 		_unpress_group();
 		if (button_group.is_valid()) {
+			last_pressed_by_device = -1;
 			button_group->emit_signal(SceneStringName(pressed), this);
 		}
 	}
@@ -435,6 +439,8 @@ void BaseButton::shortcut_input(const Ref<InputEvent> &p_event) {
 	ERR_FAIL_COND(p_event.is_null());
 
 	if (!is_disabled() && p_event->is_pressed() && is_visible_in_tree() && !p_event->is_echo() && shortcut.is_valid() && shortcut->matches_event(p_event)) {
+		Ref<InputEventJoypadButton> p_joypad_event = p_event;
+		last_pressed_by_device = p_event->get_device() + (p_joypad_event.is_null() ? -1 : 0);
 		if (toggle_mode) {
 			status.pressed = !status.pressed;
 
@@ -554,7 +560,7 @@ void BaseButton::_bind_methods() {
 
 	ClassDB::bind_method(D_METHOD("set_button_group", "button_group"), &BaseButton::set_button_group);
 	ClassDB::bind_method(D_METHOD("get_button_group"), &BaseButton::get_button_group);
-
+	ClassDB::bind_method(D_METHOD("get_last_pressed_by_device"), &BaseButton::get_last_pressed_by_device);
 	GDVIRTUAL_BIND(_pressed);
 	GDVIRTUAL_BIND(_toggled, "toggled_on");
 
