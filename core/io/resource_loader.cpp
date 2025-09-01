@@ -464,7 +464,10 @@ void ResourceLoader::_run_load_task(void *p_userdata) {
 			load_task.resource->set_last_modified_time(mt);
 		}
 #endif
-
+		
+		if (load_task.load_token != nullptr && load_task.load_token->has_callback && load_task.load_token->callback.is_valid()) {
+			MessageQueue::get_main_singleton()->push_callable(load_task.load_token->callback);
+		}
 		if (_loaded_callback) {
 			_loaded_callback(load_task.resource, load_task.local_path);
 		}
@@ -477,7 +480,9 @@ void ResourceLoader::_run_load_task(void *p_userdata) {
 
 			thread_load_mutex.unlock();
 			unlock_pending = false;
-
+			if (load_task.load_token != nullptr && load_task.load_token->has_callback && load_task.load_token->callback.is_valid()) {
+				MessageQueue::get_main_singleton()->push_callable(load_task.load_token->callback);
+			}
 			if (_loaded_callback) {
 				_loaded_callback(load_task.resource, load_task.local_path);
 			}
@@ -516,6 +521,16 @@ String ResourceLoader::_validate_local_path(const String &p_path) {
 Error ResourceLoader::load_threaded_request(const String &p_path, const String &p_type_hint, bool p_use_sub_threads, ResourceFormatLoader::CacheMode p_cache_mode) {
 	Ref<ResourceLoader::LoadToken> token = _load_start(p_path, p_type_hint, p_use_sub_threads ? LOAD_THREAD_DISTRIBUTE : LOAD_THREAD_SPAWN_SINGLE, p_cache_mode, true);
 	return token.is_valid() ? OK : FAILED;
+}
+
+Error ResourceLoader::load_threaded_request_with_callback(const String &p_path, Callable p_callback, const String &p_type_hint, bool p_use_sub_threads, ResourceFormatLoader::CacheMode p_cache_mode) {
+	Ref<ResourceLoader::LoadToken> token = _load_start(p_path, p_type_hint, p_use_sub_threads ? LOAD_THREAD_DISTRIBUTE : LOAD_THREAD_SPAWN_SINGLE, p_cache_mode, true);
+	if (token.is_valid()){
+		token->callback = p_callback;
+		token->has_callback = true;
+		return OK;
+	}
+	return FAILED;
 }
 
 ResourceLoader::LoadToken *ResourceLoader::_load_threaded_request_reuse_user_token(const String &p_path) {
@@ -745,15 +760,34 @@ Ref<Resource> ResourceLoader::load_threaded_get(const String &p_path, Error *r_e
 
 		// Support userland requesting on the main thread before the load is reported to be complete.
 		if (Thread::is_main_thread() && !load_token->local_path.is_empty()) {
-			const ThreadLoadTask &load_task = thread_load_tasks[load_token->local_path];
-			while (load_task.status == THREAD_LOAD_IN_PROGRESS) {
+			ThreadLoadStatus current_status = THREAD_LOAD_IN_PROGRESS;
+			// Check if the task still exists and get its current status
+			const int MAX_WAIT_ITERATIONS = 50000; // Prevent infinite loops
+			int wait_count = 0;
+			
+			bool should_continue = true;
+			while (should_continue && wait_count < MAX_WAIT_ITERATIONS) {
+				// Check current status
+				ThreadLoadStatus current_status = THREAD_LOAD_LOADED; // Assume completed if task missing
+				if (thread_load_tasks.has(load_token->local_path)) {
+					current_status = thread_load_tasks[load_token->local_path].status;
+				}
+				
+				if (current_status != THREAD_LOAD_IN_PROGRESS) {
+					break;
+				}
+				
 				thread_load_lock.temp_unlock();
 				bool exit = !_ensure_load_progress();
 				OS::get_singleton()->delay_usec(1000);
 				thread_load_lock.temp_relock();
-				if (exit) {
-					break;
-				}
+				
+				should_continue = !exit;
+				wait_count++;
+			}
+			
+			if (wait_count >= MAX_WAIT_ITERATIONS) {
+				ERR_PRINT("ResourceLoader: Timeout waiting for threaded load of: " + load_token->local_path);
 			}
 		}
 
