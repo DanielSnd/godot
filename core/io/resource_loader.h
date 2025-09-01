@@ -131,7 +131,8 @@ public:
 		String user_path;
 		uint32_t user_rc = 0; // Having user RC implies regular RC incremented in one, until the user RC reaches zero.
 		ThreadLoadTask *task_if_unregistered = nullptr;
-
+		Callable callback;
+		bool has_callback = false;
 		void clear();
 
 		virtual ~LoadToken();
@@ -225,6 +226,7 @@ private:
 
 public:
 	static Error load_threaded_request(const String &p_path, const String &p_type_hint = "", bool p_use_sub_threads = false, ResourceFormatLoader::CacheMode p_cache_mode = ResourceFormatLoader::CACHE_MODE_REUSE);
+	static Error load_threaded_request_with_callback(const String &p_path, Callable p_callback, const String &p_type_hint = "", bool p_use_sub_threads = false, ResourceFormatLoader::CacheMode p_cache_mode = ResourceFormatLoader::CACHE_MODE_REUSE);
 	static ThreadLoadStatus load_threaded_get_status(const String &p_path, float *r_progress = nullptr);
 	static Ref<Resource> load_threaded_get(const String &p_path, Error *r_error = nullptr);
 
