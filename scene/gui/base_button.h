@@ -141,6 +141,9 @@ public:
 
 	PackedStringArray get_configuration_warnings() const override;
 
+	int last_pressed_by_device = 0;
+	int get_last_pressed_by_device() { return last_pressed_by_device; }
+
 	BaseButton();
 	~BaseButton();
 };
