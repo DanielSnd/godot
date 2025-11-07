@@ -131,10 +131,7 @@ const Variant &Dictionary::operator[](const Variant &p_key) const {
 		VariantInternal::initialize(_p->typed_fallback, _p->typed_value.type);
 		return *_p->typed_fallback;
 	} else {
-		static Variant empty;
-		const Variant *value = _p->variant_map.getptr(key);
-		ERR_FAIL_COND_V_MSG(!value, empty, vformat(R"(Bug: Dictionary::operator[] used when there was no value for the given key "%s". Please report.)", key));
-		return *value;
+		return _p->variant_map[key];
 	}
 }
 
