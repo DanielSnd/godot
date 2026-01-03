@@ -131,10 +131,12 @@ public:
 	Variant front() const;
 	Variant back() const;
 	Variant pick_random() const;
+	Variant pick_random_seeded(int64_t seed) const;
 
 	void sort();
 	void sort_custom(const Callable &p_callable);
 	void shuffle();
+	void shuffle_seeded(int64_t seed);
 	int bsearch(const Variant &p_value, bool p_before = true) const;
 	int bsearch_custom(const Variant &p_value, const Callable &p_callable, bool p_before = true) const;
 	void reverse();
@@ -152,6 +154,8 @@ public:
 	Variant pop_back();
 	Variant pop_front();
 	Variant pop_at(int p_pos);
+	Variant pop_random();
+	Variant pop_random_seeded(int64_t seed);
 
 	Array duplicate(bool p_deep = false) const;
 	Array duplicate_deep(ResourceDeepDuplicateMode p_deep_subresources_mode = RESOURCE_DEEP_DUPLICATE_INTERNAL) const;
