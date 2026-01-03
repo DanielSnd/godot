@@ -366,6 +366,12 @@ Variant Array::pick_random() const {
 	return operator[](Math::rand() % _p->array.size());
 }
 
+Variant Array::pick_random_seeded(int64_t seed) const {
+	ERR_FAIL_COND_V_MSG(_p->array.is_empty(), Variant(), "Can't take value from empty array.");
+	uint64_t s = seed;
+	return operator[](Math::rand_from_seed(&s) % _p->array.size());
+}
+
 int Array::find(const Variant &p_value, int p_from) const {
 	if (_p->array.is_empty()) {
 		return -1;
@@ -753,6 +759,20 @@ void Array::shuffle() {
 	}
 }
 
+void Array::shuffle_seeded(int64_t seed) {
+	ERR_FAIL_COND_MSG(_p->read_only, "Array is in read-only state.");
+	const int n = _p->array.size();
+	if (n < 2) {
+		return;
+	}
+	Variant *data = _p->array.ptrw();
+	uint64_t s = seed;
+	for (int i = n - 1; i >= 1; i--) {
+		const int j = Math::rand_from_seed(&s) % (i + 1);
+		SWAP(data[i], data[j]);
+	}
+}
+
 int Array::bsearch(const Variant &p_value, bool p_before) const {
 	Variant value = p_value;
 	ERR_FAIL_COND_V(!_p->typed.validate(value, "binary search"), -1);
@@ -823,6 +843,17 @@ Variant Array::pop_at(int p_pos) {
 	const Variant ret = _p->array.get(p_pos);
 	_p->array.remove_at(p_pos);
 	return ret;
+}
+
+Variant Array::pop_random() {
+	ERR_FAIL_COND_V_MSG(_p->read_only, Variant(), "Array is in read-only state.");
+	return pop_at(Math::rand() % _p->array.size());
+}
+
+Variant Array::pop_random_seeded(int64_t seed) {
+	ERR_FAIL_COND_V_MSG(_p->read_only, Variant(), "Array is in read-only state.");
+	uint64_t s = seed;
+	return pop_at(Math::rand_from_seed(&s) % _p->array.size());
 }
 
 Variant Array::min() const {

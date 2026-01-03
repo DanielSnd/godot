@@ -1138,6 +1138,13 @@ bool VariantUtilityFunctions::is_instance_valid(const Variant &p_instance) {
 	return p_instance.get_validated_object() != nullptr;
 }
 
+bool VariantUtilityFunctions::is_valid(const Variant &p_instance) {
+	if (p_instance.get_type() != Variant::OBJECT) {
+		return false;
+	}
+	return p_instance.get_validated_object() != nullptr;
+}
+
 uint64_t VariantUtilityFunctions::rid_allocate_id() {
 	return RID_AllocBase::_gen_id();
 }
@@ -1775,6 +1782,7 @@ void Variant::_register_variant_utility_functions() {
 	FUNCBINDR(instance_from_id, sarray("instance_id"), Variant::UTILITY_FUNC_TYPE_GENERAL);
 	FUNCBINDR(is_instance_id_valid, sarray("id"), Variant::UTILITY_FUNC_TYPE_GENERAL);
 	FUNCBINDR(is_instance_valid, sarray("instance"), Variant::UTILITY_FUNC_TYPE_GENERAL);
+	FUNCBINDR(is_valid, sarray("instance"), Variant::UTILITY_FUNC_TYPE_GENERAL);
 
 	FUNCBINDR(rid_allocate_id, Vector<String>(), Variant::UTILITY_FUNC_TYPE_GENERAL);
 	FUNCBINDR(rid_from_int64, sarray("base"), Variant::UTILITY_FUNC_TYPE_GENERAL);
