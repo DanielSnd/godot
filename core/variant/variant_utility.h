@@ -149,6 +149,7 @@ struct VariantUtilityFunctions {
 	static Object *instance_from_id(int64_t p_id);
 	static bool is_instance_id_valid(int64_t p_id);
 	static bool is_instance_valid(const Variant &p_instance);
+	static bool is_valid(const Variant &p_instance);
 	static uint64_t rid_allocate_id();
 	static RID rid_from_int64(uint64_t p_base);
 	static bool is_same(const Variant &p_a, const Variant &p_b);
