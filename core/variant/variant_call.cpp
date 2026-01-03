@@ -2692,6 +2692,7 @@ static void _register_variant_builtin_methods_array() {
 	bind_method(Array, front, sarray(), varray());
 	bind_method(Array, back, sarray(), varray());
 	bind_method(Array, pick_random, sarray(), varray());
+	bind_method(Array, pick_random_seeded, sarray("seed"), varray(-1));
 	bind_method(Array, find, sarray("what", "from"), varray(0));
 	bind_method(Array, find_custom, sarray("method", "from"), varray(0));
 	bind_method(Array, rfind, sarray("what", "from"), varray(-1));
@@ -2701,9 +2702,12 @@ static void _register_variant_builtin_methods_array() {
 	bind_method(Array, pop_back, sarray(), varray());
 	bind_method(Array, pop_front, sarray(), varray());
 	bind_method(Array, pop_at, sarray("position"), varray());
+	bind_method(Array, pop_random, sarray(), varray());
+	bind_method(Array, pop_random_seeded, sarray("seed"), varray(-1));
 	bind_method(Array, sort, sarray(), varray());
 	bind_method(Array, sort_custom, sarray("func"), varray());
 	bind_method(Array, shuffle, sarray(), varray());
+	bind_method(Array, shuffle_seeded, sarray("seed"), varray(-1));
 	bind_method(Array, bsearch, sarray("value", "before"), varray(true));
 	bind_method(Array, bsearch_custom, sarray("value", "func", "before"), varray(true));
 	bind_method(Array, reverse, sarray(), varray());
