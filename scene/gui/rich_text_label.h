@@ -267,6 +267,19 @@ private:
 		Size2 rq_size;
 		Rect2 rect_offset;
 		Variant key;
+		int skew_x = 0;
+		int skew_y = 0;
+		bool has_skew = false;
+		
+		// Outline properties
+		int outline_width = 0;
+		Color outline_color = Color(0, 0, 0, 1); // Default to black
+		bool has_outline = false;
+		
+		// Rounded corners
+		int corner_radius = 0; // Radius in pixels
+		int corner_segments = 8; // Number of segments per corner (more = smoother)
+
 		ItemFrameImageBackground() {
 			type = ITEM_FRAME;
 			has_image_background = true;
@@ -324,6 +337,7 @@ private:
 		Color color;
 		Variant key;
 		String tooltip;
+		Size2 multiple;
 		ItemImage() { type = ITEM_IMAGE; }
 		~ItemImage() {
 			if (image.is_valid()) {
@@ -860,7 +874,7 @@ public:
 	String get_parsed_text() const;
 	void add_text(const String &p_text);
 	void add_hr(int p_width = 90, int p_height = 2, const Color &p_color = Color(1.0, 1.0, 1.0), HorizontalAlignment p_alignment = HORIZONTAL_ALIGNMENT_LEFT, bool p_width_in_percent = true, bool p_height_in_percent = false);
-	void add_image(const Ref<Texture2D> &p_image, int p_width = 0, int p_height = 0, const Color &p_color = Color(1.0, 1.0, 1.0), InlineAlignment p_alignment = INLINE_ALIGNMENT_CENTER, const Rect2 &p_region = Rect2(), const Variant &p_key = Variant(), bool p_pad = false, const String &p_tooltip = String(), bool p_width_in_percent = false, bool p_height_in_percent = false, const String &p_alt_text = String());
+	void add_image(const Ref<Texture2D> &p_image, int p_width = 0, int p_height = 0, const Color &p_color = Color(1.0, 1.0, 1.0), InlineAlignment p_alignment = INLINE_ALIGNMENT_CENTER, const Rect2 &p_region = Rect2(), const Variant &p_key = Variant(), bool p_pad = false, const String &p_tooltip = String(), bool p_width_in_percent = false, bool p_height_in_percent = false, const String &p_alt_text = String(), const Size2 &p_multiple = Size2());
 	void update_image(const Variant &p_key, BitField<ImageUpdateMask> p_mask, const Ref<Texture2D> &p_image, int p_width = 0, int p_height = 0, const Color &p_color = Color(1.0, 1.0, 1.0), InlineAlignment p_alignment = INLINE_ALIGNMENT_CENTER, const Rect2 &p_region = Rect2(), bool p_pad = false, const String &p_tooltip = String(), bool p_width_in_percent = false, bool p_height_in_percent = false);
 	void add_newline();
 	bool remove_paragraph(int p_paragraph, bool p_no_invalidate = false);
@@ -909,6 +923,10 @@ public:
 	void set_cell_margins(const Rect2 &p_margins);
 	void set_cell_bg_image_offset(const Rect2 &p_img_offset);
 	void set_cell_bg_image_keep_aspect_center(bool p_keep_aspect_center);
+	void set_cell_img_skew(const Size2 &p_skew);
+	void set_cell_img_outline(int p_outline_width);
+	void set_cell_img_corner_radius(int p_corner_radius);
+	void generate_rounded_quad_vertices(Vector2 p_tl, Vector2 p_tr, Vector2 p_br, Vector2 p_bl, float p_radius, int p_segments, Vector2 p_rect_size, Vector<Vector2>& p_out_points, Vector<Vector2>& p_out_uvs);
 	int get_current_table_column() const;
 	void push_cell();
 	void pop();
