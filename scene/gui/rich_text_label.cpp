@@ -1111,11 +1111,39 @@ int RichTextLabel::_draw_line(ItemFrame *p_frame, int p_line, const Vector2 &p_o
 								if (img->pad) {
 									Size2 pad_size = rect.size.min(img->image->get_size());
 									Vector2 pad_off = (rect.size - pad_size) / 2;
-									img->image->draw_rect(ci, Rect2(p_ofs + rect.position + off + pad_off, pad_size), false, img->color);
-									visible_rect = _merge_or_copy_rect(visible_rect, Rect2(p_ofs + rect.position + off + pad_off, pad_size));
+									if (static_cast<int>(img->multiple.x) > 0) {
+										float total_width = (static_cast<int>(img->multiple.x) - 1) * img->multiple.y;
+										Vector2 centering_offset = Vector2(-total_width / 2.0f, 0.0f);
+										
+										for (int i = 0; i < static_cast<int>(img->multiple.x); i++) {
+											Vector2 image_offset = Vector2(img->multiple.y * i, 0.0);
+											img->image->draw_rect(ci, Rect2(p_ofs + rect.position + off + pad_off + centering_offset + image_offset, pad_size), false, img->color);
+										}
+										
+										Vector2 start_pos = p_ofs + rect.position + off + pad_off + centering_offset;
+										Vector2 end_pos = start_pos + Vector2(total_width, 0.0) + pad_size;
+										visible_rect = _merge_or_copy_rect(visible_rect, Rect2(start_pos, Size2(end_pos.x - start_pos.x, pad_size.y)));
+									} else {
+										img->image->draw_rect(ci, Rect2(p_ofs + rect.position + off + pad_off, pad_size), false, img->color);
+										visible_rect = _merge_or_copy_rect(visible_rect, Rect2(p_ofs + rect.position + off + pad_off, pad_size));
+									}
 								} else {
-									img->image->draw_rect(ci, Rect2(p_ofs + rect.position + off, rect.size), false, img->color);
-									visible_rect = _merge_or_copy_rect(visible_rect, Rect2(p_ofs + rect.position + off, rect.size));
+									if (static_cast<int>(img->multiple.x) > 0) {
+										float total_width = (static_cast<int>(img->multiple.x) - 1) * img->multiple.y;
+										Vector2 centering_offset = Vector2(-total_width / 2.0f, 0.0f);
+										
+										for (int i = 0; i < static_cast<int>(img->multiple.x); i++) {
+											Vector2 image_offset = Vector2(img->multiple.y * i, 0.0);
+											img->image->draw_rect(ci, Rect2(p_ofs + rect.position + off + centering_offset + image_offset, rect.size), false, img->color);
+										}
+										
+										Vector2 start_pos = p_ofs + rect.position + off + centering_offset;
+										Vector2 end_pos = start_pos + Vector2(total_width, 0.0) + rect.size;
+										visible_rect = _merge_or_copy_rect(visible_rect, Rect2(start_pos, Size2(end_pos.x - start_pos.x, rect.size.y)));
+									} else {
+										img->image->draw_rect(ci, Rect2(p_ofs + rect.position + off, rect.size), false, img->color);
+										visible_rect = _merge_or_copy_rect(visible_rect, Rect2(p_ofs + rect.position + off, rect.size));
+									}
 								}
 							} break;
 							case ITEM_TABLE: {
@@ -1160,7 +1188,98 @@ int RichTextLabel::_draw_line(ItemFrame *p_frame, int p_line, const Vector2 &p_o
 													img_rect.position += img_bg->rect_offset.position;
 													img_rect.size += img_bg->rect_offset.size;
 												}
-												img_bg->image->draw_rect(ci, img_rect, false, img_bg_color);
+												if (img_bg->has_skew& (img_bg->skew_x != 0 || img_bg->skew_y != 0)) {
+													// Use polygon rendering with skew
+													Vector<Vector2> points;
+													points.resize(4);
+													
+													Vector2 top_left = img_rect.position;
+													Vector2 top_right = img_rect.position + Vector2(img_rect.size.x, 0);
+													Vector2 bottom_left = img_rect.position + Vector2(0, img_rect.size.y);
+													Vector2 bottom_right = img_rect.position + img_rect.size;
+													
+													Vector2 skewed_tl = top_left + Vector2(img_bg->skew_x * 0, img_bg->skew_y * 0);
+													Vector2 skewed_tr = top_right + Vector2(img_bg->skew_x * 0, (img_bg->skew_y * 0.1f) * img_rect.size.x);
+													Vector2 skewed_br = bottom_right + Vector2((img_bg->skew_x * 0.1f) * img_rect.size.y, (img_bg->skew_y * 0.1f) * img_rect.size.x);
+													Vector2 skewed_bl = bottom_left + Vector2((img_bg->skew_x * 0.1f) * img_rect.size.y, img_bg->skew_y * 0);
+													
+													Vector<Vector2> uvs;
+
+													if (img_bg->corner_radius > 0) {
+														// Generate rounded corners
+														generate_rounded_quad_vertices(
+															skewed_tl, skewed_tr, skewed_br, skewed_bl,
+															img_bg->corner_radius, img_bg->corner_segments,
+															img_rect.size, points, uvs
+														);
+													} else {
+														// Simple 4-point quad
+														points.resize(4);
+														points.set(0, skewed_tl);
+														points.set(1, skewed_tr);
+														points.set(2, skewed_br);
+														points.set(3, skewed_bl);
+														
+														uvs.resize(4);
+														uvs.set(0, Vector2(0, 0));
+														uvs.set(1, Vector2(1, 0));
+														uvs.set(2, Vector2(1, 1));
+														uvs.set(3, Vector2(0, 1));
+													}
+
+													if (img_bg->has_outline && img_bg->outline_width > 0) {
+														Vector<Vector2> outline_points;
+														Vector<Vector2> outline_uvs;
+														outline_points.resize(4);
+														if (img_bg->corner_radius > 0) {
+															float outline_w = img_bg->outline_width;
+															generate_rounded_quad_vertices(
+																skewed_tl + Vector2(-outline_w, -outline_w), skewed_tr + Vector2(outline_w, -outline_w), skewed_br + Vector2(outline_w, outline_w), skewed_bl + Vector2(-outline_w, outline_w),
+																img_bg->corner_radius, img_bg->corner_segments,
+																img_rect.size, outline_points, outline_uvs
+															);
+														} else {
+															// Expand each point outward by outline_width
+															float outline_w = img_bg->outline_width;
+															outline_points.resize(4);
+															outline_points.set(0, skewed_tl + Vector2(-outline_w, -outline_w));
+															outline_points.set(1, skewed_tr + Vector2(outline_w, -outline_w));
+															outline_points.set(2, skewed_br + Vector2(outline_w, outline_w));
+															outline_points.set(3, skewed_bl + Vector2(-outline_w, outline_w));
+														}
+														
+														Vector<Color> outline_colors;
+														outline_colors.resize(outline_points.size());
+														for (int i = 0; i < outline_points.size(); i++) {
+															outline_colors.set(i, img_bg->outline_color);
+														}
+														
+														// Draw outline polygon (no texture)
+														RenderingServer::get_singleton()->canvas_item_add_polygon(
+															ci, outline_points, outline_colors, outline_uvs, img_bg->image->get_rid()
+														);
+													}
+
+    												// Draw the main textured polygon
+													Vector<Color> colors;
+													colors.resize(points.size());
+													for (int i = 0; i < points.size(); i++) {
+														colors.set(i, img_bg_color);
+													}
+													
+													RenderingServer::get_singleton()->canvas_item_add_polygon(
+														ci, points, colors, uvs, img_bg->image->get_rid()
+													);
+												} else {
+													if (img_bg->has_outline && img_bg->outline_width > 0) {
+														Rect2 outline_rect = img_rect;
+														outline_rect.position -= Vector2(img_bg->outline_width, img_bg->outline_width);
+														outline_rect.size += Vector2(img_bg->outline_width * 2, img_bg->outline_width * 2);
+														
+														img_bg->image->draw_rect(ci, outline_rect, false, img_bg->outline_color);
+													}
+													img_bg->image->draw_rect(ci, img_rect, false, img_bg_color);
+												}
 												// visible_rect = _merge_or_copy_rect(visible_rect, Rect2(p_ofs + rect.position + off, rect.size));
 											}
 										} else {
@@ -4313,7 +4432,7 @@ void RichTextLabel::add_hr(int p_width, int p_height, const Color &p_color, Hori
 	}
 }
 
-void RichTextLabel::add_image(const Ref<Texture2D> &p_image, int p_width, int p_height, const Color &p_color, InlineAlignment p_alignment, const Rect2 &p_region, const Variant &p_key, bool p_pad, const String &p_tooltip, bool p_width_in_percent, bool p_height_in_percent, const String &p_alt_text) {
+void RichTextLabel::add_image(const Ref<Texture2D> &p_image, int p_width, int p_height, const Color &p_color, InlineAlignment p_alignment, const Rect2 &p_region, const Variant &p_key, bool p_pad, const String &p_tooltip, bool p_width_in_percent, bool p_height_in_percent, const String &p_alt_text, const Size2 &p_multiple) {
 	_stop_thread();
 	MutexLock data_lock(data_mutex);
 
@@ -4339,6 +4458,7 @@ void RichTextLabel::add_image(const Ref<Texture2D> &p_image, int p_width, int p_
 	} else {
 		item->image = p_image;
 	}
+	item->multiple = p_multiple;
 	item->color = p_color;
 	item->inline_align = p_alignment;
 	item->rq_size = Size2(p_width, p_height);
@@ -5178,6 +5298,41 @@ void RichTextLabel::set_cell_size_override(const Size2 &p_min_size, const Size2 
 	cell->max_size_over = p_max_size;
 }
 
+void RichTextLabel::set_cell_img_skew(const Size2 &p_skew) {
+	_stop_thread();
+	MutexLock data_lock(data_mutex);
+
+	ERR_FAIL_COND(current->type != ITEM_FRAME);
+
+	ItemFrameImageBackground *cell = static_cast<ItemFrameImageBackground *>(current);
+	ERR_FAIL_COND(!cell->cell);
+	cell->skew_x = static_cast<int>(p_skew.x);
+	cell->skew_y = static_cast<int>(p_skew.y);
+	cell->has_skew = true;
+}
+void RichTextLabel::set_cell_img_outline(int p_outline) {
+	_stop_thread();
+	MutexLock data_lock(data_mutex);
+
+	ERR_FAIL_COND(current->type != ITEM_FRAME);
+
+	ItemFrameImageBackground *cell = static_cast<ItemFrameImageBackground *>(current);
+	ERR_FAIL_COND(!cell->cell);
+	cell->outline_width = p_outline;
+	cell->has_outline = p_outline > 0;
+}
+
+void RichTextLabel::set_cell_img_corner_radius(int p_corner_radius) {
+	_stop_thread();
+	MutexLock data_lock(data_mutex);
+
+	ERR_FAIL_COND(current->type != ITEM_FRAME);
+
+	ItemFrameImageBackground *cell = static_cast<ItemFrameImageBackground *>(current);
+	ERR_FAIL_COND(!cell->cell);
+	cell->corner_radius = p_corner_radius;
+}
+
 void RichTextLabel::set_cell_padding(const Rect2 &p_padding) {
 	_stop_thread();
 	MutexLock data_lock(data_mutex);
@@ -5222,6 +5377,8 @@ void RichTextLabel::set_cell_bg_image_keep_aspect_center(bool p_keep_aspect_cent
 	ERR_FAIL_COND(!cell->cell);
 	cell->keep_aspect_center = p_keep_aspect_center;
 }
+
+
 
 void RichTextLabel::push_cell() {
 	_stop_thread();
@@ -5870,7 +6027,24 @@ void RichTextLabel::append_text(const String &p_bbcode) {
 					set_cell_size_override(Size2(subtag_b[0].to_float(), subtag_b[1].to_float()), Size2(subtag_b[0].to_float(), subtag_b[1].to_float()));
 				}
 			}
-
+			OptionMap::Iterator skew_option = bbcode_options.find("skew");
+			if (skew_option) {
+				Vector<String> subtag_b = _split_unquoted(skew_option->value, U',');
+				_normalize_subtags(subtag_b);
+				if (subtag_b.size() == 2) {
+					set_cell_img_skew(Size2(subtag_b[0].to_float(), subtag_b[1].to_float()));
+				}
+			}
+			OptionMap::Iterator outline_option = bbcode_options.find("outline");
+			if (outline_option) {
+				int ratio = outline_option->value.to_int();
+				set_cell_img_outline(ratio);
+			}
+			OptionMap::Iterator cornerradius_option = bbcode_options.find("cornerradius");
+			if (cornerradius_option) {
+				int ratio = cornerradius_option->value.to_int();
+				set_cell_img_corner_radius(ratio);
+			}
 			pos = brk_end + 1;
 			tag_stack.push_front("cell");
 		} else if (tag == "u") {
@@ -6325,7 +6499,15 @@ void RichTextLabel::append_text(const String &p_bbcode) {
 						region.size.y = region_values[3].to_float();
 					}
 				}
-
+				Size2 multiple = Size2(0.0, 0.0);
+				OptionMap::Iterator multiple_option = bbcode_options.find("multiple");
+				if (multiple_option) {
+					Vector<String> multiple_values = _split_unquoted(multiple_option->value, U',');
+					if (multiple_values.size() == 2) {
+						multiple.x = multiple_values[0].to_float();
+						multiple.y = multiple_values[1].to_float();
+					}
+				}
 				Color color = Color(1.0, 1.0, 1.0);
 				OptionMap::Iterator color_option = bbcode_options.find("color");
 				if (color_option) {
@@ -6411,7 +6593,7 @@ void RichTextLabel::append_text(const String &p_bbcode) {
 					}
 				}
 
-				add_image(texture, width, height, color, (InlineAlignment)alignment, region, Variant(), pad, tooltip, width_in_percent, height_in_percent, alt_text);
+				add_image(texture, width, height, color, (InlineAlignment)alignment, region, Variant(), pad, tooltip, width_in_percent, height_in_percent, alt_text, multiple);
 			}
 
 			pos = end;
@@ -7643,6 +7825,70 @@ void RichTextLabel::set_language(const String &p_language) {
 String RichTextLabel::get_language() const {
 	return language;
 }
+void RichTextLabel::generate_rounded_quad_vertices(
+    Vector2 p_tl, Vector2 p_tr, Vector2 p_br, Vector2 p_bl,
+    float p_radius, int p_segments,
+    Vector2 p_rect_size,
+    Vector<Vector2>& p_out_points,
+    Vector<Vector2>& p_out_uvs
+) {
+    if (p_radius <= 0 || p_segments < 1) {
+        // Fallback to simple quad
+        p_out_points.resize(4);
+        p_out_points.set(0, p_tl);
+        p_out_points.set(1, p_tr);
+        p_out_points.set(2, p_br);
+        p_out_points.set(3, p_bl);
+        
+        p_out_uvs.resize(4);
+        p_out_uvs.set(0, Vector2(0, 0));
+        p_out_uvs.set(1, Vector2(1, 0));
+        p_out_uvs.set(2, Vector2(1, 1));
+        p_out_uvs.set(3, Vector2(0, 1));
+        return;
+    }
+    
+    // Calculate corner centers (inset by radius)
+    Vector2 tl_center = p_tl + Vector2(p_radius, p_radius);
+    Vector2 tr_center = p_tr + Vector2(-p_radius, p_radius);
+    Vector2 br_center = p_br + Vector2(-p_radius, -p_radius);
+    Vector2 bl_center = p_bl + Vector2(p_radius, -p_radius);
+    
+    int total_points = p_segments * 4 + 4; // 4 corners * segments + 4 straight edges
+    p_out_points.resize(total_points);
+    p_out_uvs.resize(total_points);
+    
+    int point_idx = 0;
+    
+    // Helper lambda to add corner arc
+    auto add_corner_arc = [&](Vector2 center, float start_angle, Vector2 uv_center, float uv_radius_x, float uv_radius_y) {
+        for (int i = 0; i <= p_segments; i++) {
+            float angle = start_angle + (Math::PI * 0.5f * i) / p_segments;
+            Vector2 offset = Vector2(Math::cos(angle), Math::sin(angle)) * p_radius;
+            Vector2 point = center + offset;
+            
+            // Calculate UV coordinates
+            Vector2 uv_offset = Vector2(Math::cos(angle), Math::sin(angle));
+            uv_offset.x *= uv_radius_x;
+            uv_offset.y *= uv_radius_y;
+            Vector2 uv = uv_center + uv_offset;
+            
+            p_out_points.set(point_idx, point);
+            p_out_uvs.set(point_idx, uv);
+            point_idx++;
+        }
+    };
+    
+    // Add corners in order: top-left, top-right, bottom-right, bottom-left
+    add_corner_arc(tl_center, Math::PI, Vector2(p_radius / p_rect_size.x, p_radius / p_rect_size.y), p_radius / p_rect_size.x, p_radius / p_rect_size.y);
+    add_corner_arc(tr_center, Math::PI * 1.5f, Vector2(1.0f - p_radius / p_rect_size.x, p_radius / p_rect_size.y), p_radius / p_rect_size.x, p_radius / p_rect_size.y);
+    add_corner_arc(br_center, 0, Vector2(1.0f - p_radius / p_rect_size.x, 1.0f - p_radius / p_rect_size.y), p_radius / p_rect_size.x, p_radius / p_rect_size.y);
+    add_corner_arc(bl_center, Math::PI * 0.5f, Vector2(p_radius / p_rect_size.x, 1.0f - p_radius / p_rect_size.y), p_radius / p_rect_size.x, p_radius / p_rect_size.y);
+    
+    // Resize to actual number of points used
+    p_out_points.resize(point_idx);
+    p_out_uvs.resize(point_idx);
+}
 
 void RichTextLabel::set_autowrap_mode(TextServer::AutowrapMode p_mode) {
 	if (autowrap_mode != p_mode) {
@@ -7850,7 +8096,7 @@ void RichTextLabel::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("add_text", "text"), &RichTextLabel::add_text);
 	ClassDB::bind_method(D_METHOD("set_text", "text"), &RichTextLabel::set_text);
 	ClassDB::bind_method(D_METHOD("add_hr", "width", "height", "color", "alignment", "width_in_percent", "height_in_percent"), &RichTextLabel::add_hr, DEFVAL(90), DEFVAL(2), DEFVAL(Color(1, 1, 1, 1)), DEFVAL(HORIZONTAL_ALIGNMENT_CENTER), DEFVAL(true), DEFVAL(false));
-	ClassDB::bind_method(D_METHOD("add_image", "image", "width", "height", "color", "inline_align", "region", "key", "pad", "tooltip", "width_in_percent", "height_in_percent", "alt_text"), &RichTextLabel::add_image, DEFVAL(0), DEFVAL(0), DEFVAL(Color(1.0, 1.0, 1.0)), DEFVAL(INLINE_ALIGNMENT_CENTER), DEFVAL(Rect2()), DEFVAL(Variant()), DEFVAL(false), DEFVAL(String()), DEFVAL(false), DEFVAL(false), DEFVAL(String()));
+	ClassDB::bind_method(D_METHOD("add_image", "image", "width", "height", "color", "inline_align", "region", "key", "pad", "tooltip", "width_in_percent", "height_in_percent", "alt_text","multiple"), &RichTextLabel::add_image, DEFVAL(0), DEFVAL(0), DEFVAL(Color(1.0, 1.0, 1.0)), DEFVAL(INLINE_ALIGNMENT_CENTER), DEFVAL(Rect2()), DEFVAL(Variant()), DEFVAL(false), DEFVAL(String()), DEFVAL(false), DEFVAL(false), DEFVAL(String()), DEFVAL(Vector2()));
 	ClassDB::bind_method(D_METHOD("update_image", "key", "mask", "image", "width", "height", "color", "inline_align", "region", "pad", "tooltip", "width_in_percent", "height_in_percent"), &RichTextLabel::update_image, DEFVAL(0), DEFVAL(0), DEFVAL(Color(1.0, 1.0, 1.0)), DEFVAL(INLINE_ALIGNMENT_CENTER), DEFVAL(Rect2()), DEFVAL(false), DEFVAL(String()), DEFVAL(false), DEFVAL(false));
 	ClassDB::bind_method(D_METHOD("newline"), &RichTextLabel::add_newline);
 	ClassDB::bind_method(D_METHOD("remove_paragraph", "paragraph", "no_invalidate"), &RichTextLabel::remove_paragraph, DEFVAL(false));
