@@ -3837,6 +3837,9 @@ void Node::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_display_folded", "fold"), &Node::set_display_folded);
 	ClassDB::bind_method(D_METHOD("is_displayed_folded"), &Node::is_displayed_folded);
 
+	ClassDB::bind_method(D_METHOD("set_unique_scene_id", "unique_scene_id"), &Node::set_unique_scene_id);
+	ClassDB::bind_method(D_METHOD("get_unique_scene_id"), &Node::get_unique_scene_id);
+
 	ClassDB::bind_method(D_METHOD("set_process_internal", "enable"), &Node::set_process_internal);
 	ClassDB::bind_method(D_METHOD("is_processing_internal"), &Node::is_processing_internal);
 
