@@ -833,7 +833,7 @@ public:
 	FUNC4(environment_set_tonemap, RID, EnvironmentToneMapper, float, float)
 	FUNC2(environment_set_tonemap_agx_contrast, RID, float)
 
-	FUNC7(environment_set_adjustment, RID, bool, float, float, float, bool, RID)
+	FUNC10(environment_set_adjustment, RID, bool, float, float, float, bool, RID, bool, RID, float)
 
 	FUNC11(environment_set_fog, RID, bool, const Color &, float, float, float, float, float, float, float, EnvironmentFogMode)
 

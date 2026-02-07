@@ -1065,6 +1065,15 @@ float Environment::get_adjustment_saturation() const {
 	return adjustment_saturation;
 }
 
+void Environment::set_adjustment_color_correction_bias(float p_color_correction_bias) {
+	color_correction_bias = p_color_correction_bias;
+	_update_adjustment();
+}
+
+float Environment::get_adjustment_color_correction_bias() const {
+	return color_correction_bias;
+}
+
 void Environment::set_adjustment_color_correction(Ref<Texture> p_color_correction) {
 	adjustment_color_correction = p_color_correction;
 	Ref<GradientTexture1D> grad_tex = p_color_correction;
@@ -1074,6 +1083,7 @@ void Environment::set_adjustment_color_correction(Ref<Texture> p_color_correctio
 	Ref<Texture2D> adjustment_texture_2d = adjustment_color_correction;
 	if (adjustment_texture_2d.is_valid()) {
 		use_1d_color_correction = true;
+
 	} else {
 		use_1d_color_correction = false;
 	}
@@ -1084,8 +1094,28 @@ Ref<Texture> Environment::get_adjustment_color_correction() const {
 	return adjustment_color_correction;
 }
 
+void Environment::set_adjustment_color_correction_2(Ref<Texture> p_color_correction) {
+	adjustment_color_correction_2 = p_color_correction;
+	Ref<GradientTexture1D> grad_tex = p_color_correction;
+	if (grad_tex.is_valid()) {
+		grad_tex->connect_changed(callable_mp(this, &Environment::_update_adjustment));
+	}
+	Ref<Texture2D> adjustment_texture_2d = adjustment_color_correction_2;
+	if (adjustment_texture_2d.is_valid()) {
+		use_2d_color_correction = true;
+	} else {
+		use_2d_color_correction = false;
+	}
+	_update_adjustment();
+}
+
+Ref<Texture> Environment::get_adjustment_color_correction_2() const {
+	return adjustment_color_correction_2;
+}
+
 void Environment::_update_adjustment() {
 	RID color_correction = adjustment_color_correction.is_valid() ? adjustment_color_correction->get_rid() : RID();
+	RID color_correction_2 = adjustment_color_correction_2.is_valid() ? adjustment_color_correction_2->get_rid() : RID();
 
 	RS::get_singleton()->environment_set_adjustment(
 			environment,
@@ -1094,7 +1124,10 @@ void Environment::_update_adjustment() {
 			adjustment_contrast,
 			adjustment_saturation,
 			use_1d_color_correction,
-			color_correction);
+			color_correction,
+			use_2d_color_correction,
+			color_correction_2,
+			color_correction_bias);
 }
 
 // Private methods, constructor and destructor

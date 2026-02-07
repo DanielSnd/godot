@@ -192,6 +192,9 @@ public:
 		bool use_color_correction = false;
 		bool use_1d_color_correction = false;
 		RID color_correction_texture;
+		bool use_2d_color_correction = false;
+		RID color_correction_texture_2;
+		float color_correction_bias = 0.0f;
 
 		bool use_fxaa = false;
 		enum DebandingMode {

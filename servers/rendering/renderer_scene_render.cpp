@@ -707,8 +707,8 @@ RS::EnvironmentSDFGIYScale RendererSceneRender::environment_get_sdfgi_y_scale(RI
 
 // Adjustments
 
-void RendererSceneRender::environment_set_adjustment(RID p_env, bool p_enable, float p_brightness, float p_contrast, float p_saturation, bool p_use_1d_color_correction, RID p_color_correction) {
-	environment_storage.environment_set_adjustment(p_env, p_enable, p_brightness, p_contrast, p_saturation, p_use_1d_color_correction, p_color_correction);
+void RendererSceneRender::environment_set_adjustment(RID p_env, bool p_enable, float p_brightness, float p_contrast, float p_saturation, bool p_use_1d_color_correction, RID p_color_correction, bool p_use_2d_color_correction, RID p_color_correction_2, float p_color_correction_bias) {
+	environment_storage.environment_set_adjustment(p_env, p_enable, p_brightness, p_contrast, p_saturation, p_use_1d_color_correction, p_color_correction, p_use_2d_color_correction, p_color_correction_2, p_color_correction_bias);
 }
 
 bool RendererSceneRender::environment_get_adjustments_enabled(RID p_env) const {
@@ -733,4 +733,16 @@ bool RendererSceneRender::environment_get_use_1d_color_correction(RID p_env) con
 
 RID RendererSceneRender::environment_get_color_correction(RID p_env) const {
 	return environment_storage.environment_get_color_correction(p_env);
+}
+
+bool RendererSceneRender::environment_get_use_2d_color_correction(RID p_env) const {
+	return environment_storage.environment_get_use_2d_color_correction(p_env);
+}
+
+RID RendererSceneRender::environment_get_color_correction_2(RID p_env) const {
+	return environment_storage.environment_get_color_correction_2(p_env);
+}
+
+float RendererSceneRender::environment_get_color_correction_bias(RID p_env) const {
+	return environment_storage.environment_get_color_correction_bias(p_env);
 }

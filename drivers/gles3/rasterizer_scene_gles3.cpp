@@ -2884,17 +2884,35 @@ void RasterizerSceneGLES3::_render_post_processing(const RenderDataGLES3 *p_rend
 		RID color_correction_texture = environment_get_color_correction(p_render_data->environment);
 		if (use_bcs) {
 			bcs_spec_constants |= PostShaderGLES3::USE_BCS;
-
 			if (color_correction_texture.is_valid()) {
 				bcs_spec_constants |= PostShaderGLES3::USE_COLOR_CORRECTION;
-
 				bool use_1d_lut = environment_get_use_1d_color_correction(p_render_data->environment);
 				GLenum texture_target = GL_TEXTURE_3D;
 				if (use_1d_lut) {
 					bcs_spec_constants |= PostShaderGLES3::USE_1D_LUT;
 					texture_target = GL_TEXTURE_2D;
+					bool use_color_correction_2 = environment_get_use_2d_color_correction(p_render_data->environment);
+					if (use_color_correction_2) {
+						bcs_spec_constants |= PostShaderGLES3::USE_2D_LUT;
+						
+						// Get the second LUT and blend factor
+						RID color_correction_texture_2 = environment_get_color_correction_2(p_render_data->environment);
+						float color_correction_bias = environment_get_color_correction_bias(p_render_data->environment);
+						
+						if (color_correction_texture_2.is_valid() && color_correction_bias > 0.001f) {
+							// Bind second LUT to GL_TEXTURE3
+							glActiveTexture(GL_TEXTURE3);
+							glBindTexture(texture_target, texture_storage->texture_get_texid(color_correction_texture_2));
+							glTexParameteri(texture_target, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+							glTexParameteri(texture_target, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+							glTexParameteri(texture_target, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+							glTexParameteri(texture_target, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+							glTexParameteri(texture_target, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+						}
+					}
 				}
-
+				
+				// Bind first LUT to GL_TEXTURE2
 				glActiveTexture(GL_TEXTURE2);
 				glBindTexture(texture_target, texture_storage->texture_get_texid(color_correction_texture));
 				glTexParameteri(texture_target, GL_TEXTURE_MAG_FILTER, GL_LINEAR);

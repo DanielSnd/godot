@@ -901,7 +901,7 @@ RS::EnvironmentSDFGIYScale RendererEnvironmentStorage::environment_get_sdfgi_y_s
 
 // Adjustments
 
-void RendererEnvironmentStorage::environment_set_adjustment(RID p_env, bool p_enable, float p_brightness, float p_contrast, float p_saturation, bool p_use_1d_color_correction, RID p_color_correction) {
+void RendererEnvironmentStorage::environment_set_adjustment(RID p_env, bool p_enable, float p_brightness, float p_contrast, float p_saturation, bool p_use_1d_color_correction, RID p_color_correction, bool p_use_2d_color_correction, RID p_color_correction_2, float p_color_correction_bias) {
 	Environment *env = environment_owner.get_or_null(p_env);
 	ERR_FAIL_NULL(env);
 
@@ -913,6 +913,9 @@ void RendererEnvironmentStorage::environment_set_adjustment(RID p_env, bool p_en
 	env->adjustments_saturation = p_saturation;
 	env->use_1d_color_correction = p_use_1d_color_correction;
 	env->color_correction = p_color_correction;
+	env->use_2d_color_correction = p_use_2d_color_correction;
+	env->color_correction_2 = p_color_correction_2;
+	env->color_correction_bias = p_color_correction_bias;
 }
 
 bool RendererEnvironmentStorage::environment_get_adjustments_enabled(RID p_env) const {
@@ -949,4 +952,22 @@ RID RendererEnvironmentStorage::environment_get_color_correction(RID p_env) cons
 	Environment *env = environment_owner.get_or_null(p_env);
 	ERR_FAIL_NULL_V(env, RID());
 	return env->color_correction;
+}
+
+bool RendererEnvironmentStorage::environment_get_use_2d_color_correction(RID p_env) const {
+	Environment *env = environment_owner.get_or_null(p_env);
+	ERR_FAIL_NULL_V(env, false);
+	return env->use_2d_color_correction;
+}
+
+RID RendererEnvironmentStorage::environment_get_color_correction_2(RID p_env) const {
+	Environment *env = environment_owner.get_or_null(p_env);
+	ERR_FAIL_NULL_V(env, RID());
+	return env->color_correction_2;
+}
+
+float RendererEnvironmentStorage::environment_get_color_correction_bias(RID p_env) const {
+	Environment *env = environment_owner.get_or_null(p_env);
+	ERR_FAIL_NULL_V(env, 1.0);
+	return env->color_correction_bias;
 }

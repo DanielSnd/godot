@@ -178,6 +178,9 @@ private:
 		float adjustments_saturation = 1.0f;
 		bool use_1d_color_correction = false;
 		RID color_correction;
+		bool use_2d_color_correction = false;
+		RID color_correction_2;
+		float color_correction_bias = 0.0f;
 	};
 
 	mutable RID_Owner<Environment, true> environment_owner;
@@ -324,11 +327,14 @@ public:
 	RS::EnvironmentSDFGIYScale environment_get_sdfgi_y_scale(RID p_env) const;
 
 	// Adjustment
-	void environment_set_adjustment(RID p_env, bool p_enable, float p_brightness, float p_contrast, float p_saturation, bool p_use_1d_color_correction, RID p_color_correction);
+	void environment_set_adjustment(RID p_env, bool p_enable, float p_brightness, float p_contrast, float p_saturation, bool p_use_1d_color_correction, RID p_color_correction, bool p_use_2d_color_correction, RID p_color_correction_2, float color_correction_bias);
 	bool environment_get_adjustments_enabled(RID p_env) const;
 	float environment_get_adjustments_brightness(RID p_env) const;
 	float environment_get_adjustments_contrast(RID p_env) const;
 	float environment_get_adjustments_saturation(RID p_env) const;
 	bool environment_get_use_1d_color_correction(RID p_env) const;
+	float environment_get_color_correction_bias(RID p_env) const;
 	RID environment_get_color_correction(RID p_env) const;
+	bool environment_get_use_2d_color_correction(RID p_env) const;
+	RID environment_get_color_correction_2(RID p_env) const;
 };

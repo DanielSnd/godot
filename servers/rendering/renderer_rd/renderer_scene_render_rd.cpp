@@ -942,6 +942,13 @@ void RendererSceneRenderRD::_post_process_subpass(RID p_source_texture, RID p_fr
 			tonemap.use_color_correction = true;
 			tonemap.use_1d_color_correction = environment_get_use_1d_color_correction(p_render_data->environment);
 			tonemap.color_correction_texture = texture_storage->texture_get_rd_texture(environment_get_color_correction(p_render_data->environment), !tonemap.convert_to_srgb);
+			tonemap.use_2d_color_correction = environment_get_use_2d_color_correction(p_render_data->environment);
+			if (tonemap.use_2d_color_correction && environment_get_color_correction_2(p_render_data->environment).is_valid()) {
+				tonemap.color_correction_bias = environment_get_color_correction_bias(p_render_data->environment);
+				if (tonemap.color_correction_bias > 0.001f) {
+					tonemap.color_correction_texture = texture_storage->texture_get_rd_texture(environment_get_color_correction_2(p_render_data->environment), !tonemap.convert_to_srgb);
+				}
+			}
 		}
 	}
 
