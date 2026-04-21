@@ -31,6 +31,7 @@
 #pragma once
 
 #include "core/error/error_macros.h"
+#include "core/variant/binder_common.h"
 
 enum class InputEventType {
 	INVALID = -1,
@@ -165,4 +166,71 @@ constexpr MouseButtonMask operator|(MouseButtonMask p_a, MouseButtonMask p_b) {
 
 constexpr MouseButtonMask &operator|=(MouseButtonMask &p_a, MouseButtonMask p_b) {
 	return p_a = p_a | p_b;
+}
+
+enum class PlayerId : uint8_t {
+	P1 = 0,
+	P2 = 1,
+	P3 = 2,
+	P4 = 3,
+	P5 = 4,
+	P6 = 5,
+	P7 = 6,
+	P8 = 7,
+};
+
+template <>
+struct VariantCaster<PlayerId> {
+	static _FORCE_INLINE_ PlayerId cast(const Variant &p_variant) {
+		return (PlayerId)(int)p_variant;
+	}
+};
+template <>
+struct PtrToArg<PlayerId> {
+	_FORCE_INLINE_ static PlayerId convert(const void *p_ptr) {
+		return PlayerId(*((uint8_t *)p_ptr));
+	}
+	typedef int64_t EncodeT;
+	_FORCE_INLINE_ static void encode(PlayerId p_val, const void *p_ptr) {
+		*(uint8_t *)p_ptr = (uint8_t)p_val;
+	}
+};
+
+enum {
+	PLAYERS_MAX = 8,
+};
+
+enum PlayerMask : uint8_t {
+	PLAYER_NONE = 0U,
+	PLAYER_1 = 1U << 0,
+	PLAYER_2 = 1U << 1,
+	PLAYER_3 = 1U << 2,
+	PLAYER_4 = 1U << 3,
+	PLAYER_5 = 1U << 4,
+	PLAYER_6 = 1U << 5,
+	PLAYER_7 = 1U << 6,
+	PLAYER_8 = 1U << 7,
+	PLAYER_ALL = 0xFFU,
+};
+
+// Specializations for BitField<PlayerMask>
+template <>
+struct VariantCaster<BitField<PlayerMask>> {
+	static _FORCE_INLINE_ BitField<PlayerMask> cast(const Variant &p_variant) {
+		return BitField<PlayerMask>((uint64_t)p_variant);
+	}
+};
+template <>
+struct PtrToArg<BitField<PlayerMask>> {
+	_FORCE_INLINE_ static BitField<PlayerMask> convert(const void *p_ptr) {
+		return BitField<PlayerMask>(*((uint64_t *)p_ptr));
+	}
+	typedef int64_t EncodeT;
+	_FORCE_INLINE_ static void encode(BitField<PlayerMask> p_val, const void *p_ptr) {
+		*(uint64_t *)p_ptr = p_val.operator uint64_t();
+	}
+};
+
+inline PlayerMask player_id_to_mask(PlayerId id) {
+	return PlayerMask(1U << (uint8_t)id);
 }
