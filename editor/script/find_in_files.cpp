@@ -337,10 +337,10 @@ void FindInFilesDialog::set_search_text(const String &p_text) {
 		_on_search_text_modified(p_text);
 	}
 	if (replace_mode && !p_text.is_empty()) {
-		callable_mp((Control *)replace_text_line_edit, &Control::grab_focus).call_deferred(false);
+		callable_mp((Control *)replace_text_line_edit, &Control::grab_focus).call_deferred(PlayerId::P1,false);
 		replace_text_line_edit->select_all();
 	} else {
-		callable_mp((Control *)search_text_line_edit, &Control::grab_focus).call_deferred(false);
+		callable_mp((Control *)search_text_line_edit, &Control::grab_focus).call_deferred(PlayerId::P1,false);
 		search_text_line_edit->select_all();
 	}
 }
