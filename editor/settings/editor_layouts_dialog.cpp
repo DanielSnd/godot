@@ -116,7 +116,7 @@ void EditorLayoutsDialog::_post_popup() {
 		layout_names->set_item_metadata(0, "Default");
 		name->grab_focus();
 	} else {
-		layout_names->grab_focus(true);
+		layout_names->grab_focus(PlayerId::P1, true);
 		get_ok_button()->set_disabled(true);
 	}
 

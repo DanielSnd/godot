@@ -961,8 +961,12 @@ void TextEdit::_notification(int p_what) {
 			if (!editable) {
 				draw_caret = is_drawing_caret_when_editable_disabled();
 			}
-			if (has_focus(Engine::get_singleton()->is_editor_hint() || GLOBAL_GET_CACHED(int, "gui/common/show_focus_state_on_pointer_event") != 1)) {
-				theme_cache.style_focus->draw(ci, Rect2(Point2(), size));
+
+			for (int i = 0; i < PLAYERS_MAX; i++) {
+				if (has_focus(((PlayerId)i), Engine::get_singleton()->is_editor_hint() || GLOBAL_GET_CACHED(int, "gui/common/show_focus_state_on_pointer_event") != 1)) {
+					theme_cache.style_focus->draw(ci, Rect2(Point2(), size));
+					break;
+				}
 			}
 
 			int visible_rows = get_visible_line_count() + 1;
@@ -2479,7 +2483,7 @@ void TextEdit::gui_input(const Ref<InputEvent> &p_gui_input) {
 					menu->set_position(get_screen_transform().xform(mpos));
 					menu->reset_size();
 					menu->popup();
-					grab_focus(true);
+					grab_focus(PlayerId::P1, true);
 				}
 			}
 		} else {
@@ -3603,7 +3607,7 @@ void TextEdit::drop_data(const Point2 &p_point, const Variant &p_data) {
 		insert_text_at_caret(p_data);
 
 		select(drop_at_line, drop_at_column, get_caret_line(), get_caret_column());
-		grab_focus(true);
+		grab_focus(PlayerId::P1, true);
 		adjust_viewport_to_caret();
 		end_multicaret_edit();
 		end_complex_operation();
