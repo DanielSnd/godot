@@ -152,7 +152,7 @@ void ProjectListItemControl::_notification(int p_what) {
 				int idx = pl->get_index(this);
 				if (idx >= 0) {
 					// has_focus(true) is false on mouse-initiated focus, true on keyboard navigation.
-					pl->select_project(idx, !has_focus(true));
+					pl->select_project(idx, !has_focus(PlayerId::P1, true));
 
 					pl->emit_signal(SNAME(ProjectList::SIGNAL_SELECTION_CHANGED));
 				}
@@ -1112,7 +1112,7 @@ int ProjectList::get_index(const ProjectListItemControl *p_control) const {
 void ProjectList::ensure_project_visible(int p_index) {
 	const Item &item = _projects[p_index];
 	// Since follow focus is enabled.
-	item.control->grab_focus(true);
+	item.control->grab_focus(PlayerId::P1, true);
 }
 
 void ProjectList::_create_project_item_control(int p_index) {
@@ -1298,7 +1298,7 @@ void ProjectList::_open_menu(const Vector2 &p_at, Control *p_hb) {
 		project_context_menu->connect(SceneStringName(id_pressed), callable_mp(this, &ProjectList::_menu_option));
 		_update_menu_icons();
 	}
-	clicked_project.control->grab_focus(true);
+	clicked_project.control->grab_focus(PlayerId::P1, true);
 
 	for (int id : Vector<int>{
 				 MENU_EDIT,

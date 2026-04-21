@@ -1054,9 +1054,9 @@ void EditorProperty::grab_focus(int p_focusable) {
 
 	if (p_focusable >= 0) {
 		ERR_FAIL_INDEX(p_focusable, focusables.size());
-		focusables[p_focusable]->grab_focus(true);
+		focusables[p_focusable]->grab_focus(PlayerId::P1,true);
 	} else {
-		focusables[0]->grab_focus(true);
+		focusables[0]->grab_focus(PlayerId::P1,true);
 	}
 }
 
@@ -1068,7 +1068,7 @@ void EditorProperty::select(int p_focusable) {
 
 	if (p_focusable >= 0) {
 		ERR_FAIL_INDEX(p_focusable, focusables.size());
-		focusables[p_focusable]->grab_focus(true);
+		focusables[p_focusable]->grab_focus(PlayerId::P1,true);
 	} else {
 		selected = true;
 		queue_redraw();
@@ -2938,7 +2938,7 @@ void EditorInspectorArray::_panel_draw(int p_index) {
 	if (style.is_null()) {
 		return;
 	}
-	if (array_elements[p_index].panel->has_focus(true)) {
+	if (array_elements[p_index].panel->has_focus(PlayerId::P1,true)) {
 		array_elements[p_index].panel->draw_style_box(style, Rect2(Vector2(), array_elements[p_index].panel->get_size()));
 	}
 }

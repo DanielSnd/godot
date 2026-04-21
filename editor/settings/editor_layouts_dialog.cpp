@@ -107,7 +107,7 @@ void EditorLayoutsDialog::_post_popup() {
 	if (name->is_visible()) {
 		name->grab_focus();
 	} else {
-		layout_names->grab_focus(true);
+		layout_names->grab_focus(PlayerId::P1, true);
 	}
 }
 

@@ -1761,6 +1761,9 @@ ProjectSettings::ProjectSettings() {
 	GLOBAL_DEF("audio/general/ios/mix_with_others", false);
 
 	_add_builtin_input_map();
+	GLOBAL_DEF(PropertyInfo(Variant::INT, "input_multiplayer/keyboard_player_id_override", PROPERTY_HINT_ENUM, "P1,P2,P3,P4,P5,P6,P7,P8"), (int)PlayerId::P1);
+	GLOBAL_DEF(PropertyInfo(Variant::INT, "input_multiplayer/mouse_player_id_override", PROPERTY_HINT_ENUM, "P1,P2,P3,P4,P5,P6,P7,P8"), (int)PlayerId::P1);
+	GLOBAL_DEF(PropertyInfo(Variant::INT, "input_multiplayer/touch_player_id_override", PROPERTY_HINT_ENUM, "P1,P2,P3,P4,P5,P6,P7,P8"), (int)PlayerId::P1);
 
 	// Keep the enum values in sync with the `DisplayServerEnums::ScreenOrientation` enum.
 	custom_prop_info["display/window/handheld/orientation"] = PropertyInfo(Variant::INT, "display/window/handheld/orientation", PROPERTY_HINT_ENUM, "Landscape,Portrait,Reverse Landscape,Reverse Portrait,Sensor Landscape,Sensor Portrait,Sensor");

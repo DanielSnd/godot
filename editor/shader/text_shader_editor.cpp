@@ -1507,7 +1507,7 @@ void TextShaderEditor::_menu_option(int p_option) {
 		} break;
 	}
 	if (p_option != SEARCH_FIND && p_option != SEARCH_REPLACE && p_option != SEARCH_GOTO_LINE) {
-		callable_mp((Control *)tx, &Control::grab_focus).call_deferred(false);
+		callable_mp((Control *)tx, &Control::grab_focus).call_deferred(PlayerId::P1,false);
 	}
 }
 
