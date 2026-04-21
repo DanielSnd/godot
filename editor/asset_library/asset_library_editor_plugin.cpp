@@ -401,7 +401,7 @@ void EditorAssetLibraryItemDescription::preview_click(int p_id) {
 				preview->set_texture(preview_images[i].image);
 				child_controls_changed();
 			}
-			preview_images[i].button->grab_focus(true);
+			preview_images[i].button->grab_focus(PlayerId::P1, true);
 		} else {
 			_link_click(preview_images[i].video_link);
 		}

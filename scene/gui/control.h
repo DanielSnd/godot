@@ -34,6 +34,7 @@
 #include "scene/main/canvas_item.h"
 #include "scene/resources/theme.h"
 #include "servers/display/accessibility_server_enums.h"
+#include "core/input/input_enums.h"
 
 class Label;
 class Panel;
@@ -288,6 +289,9 @@ private:
 		NodePath focus_next;
 		NodePath focus_prev;
 
+		// Accept inputs from all players by default.
+		BitField<PlayerMask> player_mask = PLAYER_ALL;
+
 		ObjectID shortcut_context;
 
 		// Accessibility.
@@ -392,7 +396,7 @@ private:
 
 	bool _is_focusable() const;
 	void _window_find_focus_neighbor(const Vector2 &p_dir, Node *p_at, const Rect2 &p_rect, const Rect2 &p_clamp, real_t p_min, real_t &r_closest_dist_squared, Control **r_closest);
-	Control *_get_focus_neighbor(Side p_side, int p_count = 0);
+	Control *_get_focus_neighbor(Side p_side, int p_count = 0, PlayerId p_player_id = PlayerId::P1);
 	bool _is_focus_mode_enabled() const;
 	void _update_focus_behavior_recursive();
 	void _propagate_focus_behavior_recursive_recursively(bool p_enabled, bool p_skip_non_inherited);
@@ -444,8 +448,6 @@ protected:
 	void _accessibility_action_scroll_into_view(const Variant &p_data);
 
 #ifndef DISABLE_DEPRECATED
-	bool _has_focus_bind_compat_110250() const;
-	void _grab_focus_bind_compat_110250();
 	static void _bind_compatibility_methods();
 #endif //DISABLE_DEPRECATED
 
@@ -601,6 +603,10 @@ public:
 	void set_propagate_maximum_size(bool p_propagate);
 	bool is_propagating_maximum_size();
 
+	static inline bool is_player_id_in_mask(BitField<PlayerMask> p_player_mask, PlayerId p_player_id) {
+		return p_player_mask.has_flag(player_id_to_mask(p_player_id));
+	}
+	
 	void update_maximum_size();
 	void update_minimum_size();
 
@@ -702,14 +708,15 @@ public:
 	FocusMode get_focus_mode_with_override() const;
 	void set_focus_behavior_recursive(FocusBehaviorRecursive p_focus_behavior_recursive);
 	FocusBehaviorRecursive get_focus_behavior_recursive() const;
-	bool has_focus(bool p_ignore_hidden_focus = false) const;
-	void grab_focus(bool p_hide_focus = false);
+	TypedArray<int> get_focused_players_id() const;
+	bool has_focus(PlayerId p_player_id = PlayerId::P1,bool p_ignore_hidden_focus = false) const;
+	void grab_focus(PlayerId p_player_id = PlayerId::P1,bool p_hide_focus = false);
 	void grab_click_focus();
-	void release_focus();
+	void release_focus(PlayerId p_player_id = PlayerId::P1);
 
-	Control *find_next_valid_focus() const;
-	Control *find_prev_valid_focus() const;
-	Control *find_valid_focus_neighbor(Side p_size) const;
+	Control *find_next_valid_focus(PlayerId p_player_id = PlayerId::P1) const;
+	Control *find_prev_valid_focus(PlayerId p_player_id = PlayerId::P1) const;
+	Control *find_valid_focus_neighbor(Side p_size, PlayerId p_player_id = PlayerId::P1) const;
 
 	void set_focus_neighbor(Side p_side, const NodePath &p_neighbor);
 	NodePath get_focus_neighbor(Side p_side) const;
@@ -745,6 +752,9 @@ public:
 
 	void set_accessibility_flow_to_nodes(const TypedArray<NodePath> &p_node_path);
 	TypedArray<NodePath> get_accessibility_flow_to_nodes() const;
+	void set_player_mask(BitField<PlayerMask> p_player_mask);
+	BitField<PlayerMask> get_player_mask() const;
+	BitField<PlayerMask> calculate_ancestral_player_mask() const;
 
 	// Rendering.
 
