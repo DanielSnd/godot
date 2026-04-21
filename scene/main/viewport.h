@@ -34,6 +34,7 @@
 #include "scene/resources/texture.h"
 #include "servers/display/display_server_enums.h"
 #include "servers/rendering/rendering_server_enums.h"
+#include "core/input/input_enums.h"
 
 class AudioListener2D;
 class Camera2D;
@@ -380,7 +381,7 @@ private:
 		Control *mouse_focus = nullptr;
 		Control *mouse_click_grabber = nullptr;
 		BitField<MouseButtonMask> mouse_focus_mask = MouseButtonMask::NONE;
-		Control *key_focus = nullptr;
+		Control *key_focus[PLAYERS_MAX] = { nullptr };
 		bool hide_focus = false;
 		ObjectID mouse_over;
 		LocalVector<ObjectID> mouse_over_hierarchy;
@@ -462,8 +463,8 @@ private:
 	void _gui_show_tooltip();
 	void _gui_show_tooltip_at(const Point2i &p_pos);
 
-	void _gui_remove_control(Control *p_control);
-	void _gui_hide_control(Control *p_control);
+	void _gui_remove_control(Control *p_control, PlayerId p_player_id = PlayerId::P1);
+	void _gui_hide_control(Control *p_control, PlayerId p_player_id = PlayerId::P1);
 	void _gui_update_mouse_over();
 
 	void _gui_force_drag_start();
@@ -472,10 +473,10 @@ private:
 	void _gui_set_drag_preview(Control *p_base, Control *p_control);
 	Control *_gui_get_drag_preview();
 
-	void _gui_remove_focus_for_window(Node *p_window);
-	void _gui_unfocus_control(Control *p_control);
-	bool _gui_control_has_focus(const Control *p_control, bool p_ignore_hidden_focus = false);
-	void _gui_control_grab_focus(Control *p_control, bool p_hide_focus = false);
+	void _gui_remove_focus_for_window(Node *p_window, PlayerId p_player_id = PlayerId::P1);
+	void _gui_unfocus_control(Control *p_control, PlayerId p_player_id = PlayerId::P1);
+	bool _gui_control_has_focus(const Control *p_control, PlayerId p_player_id = PlayerId::P1, bool p_ignore_hidden_focus = false);
+	void _gui_control_grab_focus(Control *p_control, PlayerId p_player_id = PlayerId::P1, bool p_hide_focus = false);
 	void _gui_grab_click_focus(Control *p_control);
 	void _post_gui_grab_click_focus();
 	void _gui_accept_event();
@@ -628,8 +629,8 @@ public:
 	Vector2 get_camera_coords(const Vector2 &p_viewport_coords) const;
 	Vector2 get_camera_rect_size() const;
 
-	void _push_text_input(const String &p_text, bool p_emit_text_changed_signal = false);
-	void push_text_input(const String &p_text);
+	void _push_text_input(const String &p_text, PlayerId p_player_id = PlayerId::P1, bool p_emit_text_changed_signal = false);
+	void push_text_input(const String &p_text, PlayerId p_player_id = PlayerId::P1);
 	void push_input(RequiredParam<InputEvent> rp_event, bool p_local_coords = false);
 #ifndef DISABLE_DEPRECATED
 	void push_unhandled_input(RequiredParam<InputEvent> rp_event, bool p_local_coords = false);
@@ -663,8 +664,8 @@ public:
 	void gui_reset_canvas_sort_index();
 	int gui_get_canvas_sort_index();
 
-	void gui_release_focus();
-	Control *gui_get_focus_owner() const;
+	void gui_release_focus(PlayerId p_player_id = PlayerId::P1);
+	Control *gui_get_focus_owner(PlayerId p_player_id = PlayerId::P1) const;
 	Control *gui_get_hovered_control() const;
 	Window *get_focused_subwindow() const { return gui.subwindow_focused; }
 
