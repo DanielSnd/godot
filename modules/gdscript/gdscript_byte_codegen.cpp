@@ -908,6 +908,11 @@ void GDScriptByteCodeGenerator::write_get_static_variable(const Address &p_targe
 	append(p_index);
 }
 
+void GDScriptByteCodeGenerator::write_sync_member(int p_index) {
+	append_opcode(GDScriptFunction::OPCODE_SYNC_MEMBER);
+	append(p_index);
+}
+
 void GDScriptByteCodeGenerator::write_assign_with_conversion(const Address &p_target, const Address &p_source) {
 	switch (p_target.type.kind) {
 		case GDScriptDataType::BUILTIN: {
