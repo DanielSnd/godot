@@ -63,11 +63,27 @@ class GDScript : public Script {
 	bool _is_abstract = false;
 
 	struct MemberInfo {
+		enum SyncAuthorityMode {
+			SYNC_AUTHORITY_NONE,
+			SYNC_AUTHORITY_SERVER,
+			SYNC_AUTHORITY_OWNER,
+		};
+
+		enum SyncBehavior {
+			SYNC_BEHAVIOR_NONE,
+			SYNC_BEHAVIOR_ON_SET,
+			SYNC_BEHAVIOR_MANUAL,
+			SYNC_BEHAVIOR_AUTO,
+			SYNC_BEHAVIOR_ALWAYS,
+		};
+
 		int index = 0;
 		StringName setter;
 		StringName getter;
 		GDScriptDataType data_type;
 		PropertyInfo property_info;
+		SyncAuthorityMode sync_authority = SYNC_AUTHORITY_NONE;
+		SyncBehavior sync_behavior = SYNC_BEHAVIOR_NONE;
 	};
 
 	struct ClearData {
@@ -95,6 +111,7 @@ class GDScript : public Script {
 
 	// Members are just indices to the instantiated script.
 	HashMap<StringName, MemberInfo> member_indices; // Includes member info of all base GDScript classes.
+	Vector<MemberInfo> member_info_by_index;
 	HashSet<StringName> members; // Only members of the current class.
 
 	// Only static variables of the current class.
@@ -360,6 +377,7 @@ class GDScriptInstance : public ScriptInstance {
 	HashMap<StringName, int> member_indices_cache; //used only for hot script reloading
 #endif
 	Vector<Variant> members;
+	Vector<Variant> member_syncers;
 
 	SelfList<GDScriptFunctionState>::List pending_func_states;
 
@@ -367,6 +385,9 @@ class GDScriptInstance : public ScriptInstance {
 	SelfList<GDScriptInstance> script_instance_list; // Linked list of instances with the same script.
 
 	void _call_implicit_ready_recursively(GDScript *p_script);
+	bool _ensure_sync_member_registered(int p_index);
+	void _register_annotated_sync_members();
+	bool _sync_member_by_index(int p_index);
 
 public:
 	virtual Object *get_owner() { return owner; }

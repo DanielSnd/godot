@@ -404,6 +404,12 @@ void GDScriptFunction::disassemble(const Vector<String> &p_code_lines) const {
 
 				incr += 4;
 			} break;
+			case OPCODE_SYNC_MEMBER: {
+				text += "sync_member ";
+				text += itos(_code_ptr[ip + 1]);
+
+				incr += 2;
+			} break;
 			case OPCODE_ASSIGN: {
 				text += "assign ";
 				text += DADDR(1);
