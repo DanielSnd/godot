@@ -1221,6 +1221,10 @@ GDScriptCodeGenerator::Address GDScriptCompiler::_parse_expression(CodeGen &code
 							args.push_back(assigned);
 							GDScriptCodeGenerator::Address call_base = is_static ? GDScriptCodeGenerator::Address(GDScriptCodeGenerator::Address::CLASS) : GDScriptCodeGenerator::Address(GDScriptCodeGenerator::Address::SELF);
 							gen->write_call(GDScriptCodeGenerator::Address(), call_base, member_property_setter_function, args);
+							const GDScript::MemberInfo &minfo = codegen.script->member_indices[var_name];
+							if (!is_static && minfo.sync_behavior == GDScript::MemberInfo::SYNC_BEHAVIOR_ON_SET) {
+								gen->write_sync_member(minfo.index);
+							}
 						} else if (is_static) {
 							GDScriptCodeGenerator::Address temp = codegen.add_temporary(static_var_data_type);
 							gen->write_assign(temp, assigned);
@@ -1228,6 +1232,10 @@ GDScriptCodeGenerator::Address GDScriptCompiler::_parse_expression(CodeGen &code
 							gen->pop_temporary();
 						} else {
 							gen->write_assign(target_member_property, assigned);
+							const GDScript::MemberInfo &minfo = codegen.script->member_indices[var_name];
+							if (minfo.sync_behavior == GDScript::MemberInfo::SYNC_BEHAVIOR_ON_SET) {
+								gen->write_sync_member(minfo.index);
+							}
 						}
 						if (!known_type) {
 							gen->write_end_jump_if_shared();
@@ -1239,6 +1247,12 @@ GDScriptCodeGenerator::Address GDScriptCompiler::_parse_expression(CodeGen &code
 					}
 					// Save the temp value back to the base by calling its setter.
 					gen->write_call(GDScriptCodeGenerator::Address(), base, member_property_setter_function, { assigned });
+					if (base.mode == GDScriptCodeGenerator::Address::MEMBER && !is_static) {
+						const GDScript::MemberInfo &minfo = codegen.script->member_indices[var_name];
+						if (minfo.sync_behavior == GDScript::MemberInfo::SYNC_BEHAVIOR_ON_SET) {
+							gen->write_sync_member(minfo.index);
+						}
+					}
 					if (!base_known_type) {
 						gen->write_end_jump_if_shared();
 					}
@@ -1363,6 +1377,12 @@ GDScriptCodeGenerator::Address GDScriptCompiler::_parse_expression(CodeGen &code
 					args.push_back(to_assign);
 					GDScriptCodeGenerator::Address call_base = is_static ? GDScriptCodeGenerator::Address(GDScriptCodeGenerator::Address::CLASS) : GDScriptCodeGenerator::Address(GDScriptCodeGenerator::Address::SELF);
 					gen->write_call(GDScriptCodeGenerator::Address(), call_base, setter_function, args);
+					if (!is_static) {
+						const GDScript::MemberInfo &minfo = codegen.script->member_indices[var_name];
+						if (minfo.sync_behavior == GDScript::MemberInfo::SYNC_BEHAVIOR_ON_SET) {
+							gen->write_sync_member(minfo.index);
+						}
+					}
 				} else if (is_static) {
 					GDScriptCodeGenerator::Address temp = codegen.add_temporary(static_var_data_type);
 					if (assignment->use_conversion_assign) {
@@ -1378,6 +1398,12 @@ GDScriptCodeGenerator::Address GDScriptCompiler::_parse_expression(CodeGen &code
 						gen->write_assign_with_conversion(target, to_assign);
 					} else {
 						gen->write_assign(target, to_assign);
+					}
+					if (is_member) {
+						const GDScript::MemberInfo &minfo = codegen.script->member_indices[var_name];
+						if (minfo.sync_behavior == GDScript::MemberInfo::SYNC_BEHAVIOR_ON_SET) {
+							gen->write_sync_member(minfo.index);
+						}
 					}
 				}
 
@@ -2734,6 +2760,7 @@ Error GDScriptCompiler::_prepare_compilation(GDScript *p_script, const GDScriptP
 
 	p_script->member_functions.clear();
 	p_script->member_indices.clear();
+	p_script->member_info_by_index.clear();
 	p_script->static_variables_indices.clear();
 	p_script->static_variables.clear();
 	p_script->_signals.clear();
@@ -2815,6 +2842,7 @@ Error GDScriptCompiler::_prepare_compilation(GDScript *p_script, const GDScriptP
 
 			p_script->base = base;
 			p_script->member_indices = base->member_indices;
+			p_script->member_info_by_index = base->member_info_by_index;
 		} break;
 		default: {
 			_set_error("Parser bug (please report): invalid inheritance.", nullptr);
@@ -2859,6 +2887,8 @@ Error GDScriptCompiler::_prepare_compilation(GDScript *p_script, const GDScriptP
 
 				const GDScriptParser::DataType variable_type = variable->get_datatype();
 				minfo.data_type = _gdtype_from_datatype(variable_type, p_script);
+				minfo.sync_authority = static_cast<GDScript::MemberInfo::SyncAuthorityMode>(variable->sync_authority);
+				minfo.sync_behavior = static_cast<GDScript::MemberInfo::SyncBehavior>(variable->sync_behavior);
 
 				PropertyInfo prop_info = variable_type.to_property_info(name);
 				PropertyInfo export_info = variable->export_info;
@@ -2904,6 +2934,10 @@ Error GDScriptCompiler::_prepare_compilation(GDScript *p_script, const GDScriptP
 					minfo.index = p_script->member_indices.size();
 					p_script->member_indices[name] = minfo;
 					p_script->members.insert(name);
+					if (minfo.index >= p_script->member_info_by_index.size()) {
+						p_script->member_info_by_index.resize(minfo.index + 1);
+					}
+					p_script->member_info_by_index.write[minfo.index] = minfo;
 				}
 
 #ifdef TOOLS_ENABLED
@@ -2961,6 +2995,10 @@ Error GDScriptCompiler::_prepare_compilation(GDScript *p_script, const GDScriptP
 
 				p_script->member_indices[name] = minfo;
 				p_script->members.insert(name);
+				if (minfo.index >= p_script->member_info_by_index.size()) {
+					p_script->member_info_by_index.resize(minfo.index + 1);
+				}
+				p_script->member_info_by_index.write[minfo.index] = minfo;
 			} break;
 
 			case GDScriptParser::ClassNode::Member::FUNCTION: {

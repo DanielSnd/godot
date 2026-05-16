@@ -1252,6 +1252,20 @@ public:
 	};
 
 	struct VariableNode : public AssignableNode {
+		enum SyncAuthorityMode {
+			SYNC_AUTHORITY_NONE,
+			SYNC_AUTHORITY_SERVER,
+			SYNC_AUTHORITY_OWNER,
+		};
+
+		enum SyncBehavior {
+			SYNC_BEHAVIOR_NONE,
+			SYNC_BEHAVIOR_ON_SET,
+			SYNC_BEHAVIOR_MANUAL,
+			SYNC_BEHAVIOR_AUTO,
+			SYNC_BEHAVIOR_ALWAYS,
+		};
+
 		enum PropertyStyle {
 			PROP_NONE,
 			PROP_INLINE,
@@ -1271,6 +1285,8 @@ public:
 
 		bool exported = false;
 		bool onready = false;
+		SyncAuthorityMode sync_authority = SYNC_AUTHORITY_NONE;
+		SyncBehavior sync_behavior = SYNC_BEHAVIOR_NONE;
 		PropertyInfo export_info;
 		int assignments = 0;
 		bool is_static = false;
@@ -1563,6 +1579,7 @@ private:
 	bool static_unload_annotation(AnnotationNode *p_annotation, Node *p_target, ClassNode *p_class);
 	bool abstract_annotation(AnnotationNode *p_annotation, Node *p_target, ClassNode *p_class);
 	bool onready_annotation(AnnotationNode *p_annotation, Node *p_target, ClassNode *p_class);
+	bool sync_property_annotation(AnnotationNode *p_annotation, Node *p_target, ClassNode *p_class);
 	template <PropertyHint t_hint, Variant::Type t_type>
 	bool export_annotations(AnnotationNode *p_annotation, Node *p_target, ClassNode *p_class);
 	bool export_storage_annotation(AnnotationNode *p_annotation, Node *p_target, ClassNode *p_class);
