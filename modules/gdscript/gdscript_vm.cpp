@@ -275,6 +275,7 @@ void (*type_init_function_table[])(Variant *) = {
 		&&OPCODE_GET_MEMBER, \
 		&&OPCODE_SET_STATIC_VARIABLE, \
 		&&OPCODE_GET_STATIC_VARIABLE, \
+		&&OPCODE_SYNC_MEMBER, \
 		&&OPCODE_ASSIGN, \
 		&&OPCODE_ASSIGN_NULL, \
 		&&OPCODE_ASSIGN_TRUE, \
@@ -1378,6 +1379,17 @@ Variant GDScriptFunction::call(GDScriptInstance *p_instance, const Variant **p_a
 				*target = gdscript->static_variables[index];
 
 				ip += 4;
+			}
+			DISPATCH_OPCODE;
+
+			OPCODE(OPCODE_SYNC_MEMBER) {
+				CHECK_SPACE(2);
+				GD_ERR_BREAK(!p_instance);
+
+				const int member_index = _code_ptr[ip + 1];
+				p_instance->_sync_member_by_index(member_index);
+
+				ip += 2;
 			}
 			DISPATCH_OPCODE;
 

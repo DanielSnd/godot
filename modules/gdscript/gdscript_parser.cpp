@@ -149,6 +149,7 @@ GDScriptParser::GDScriptParser() {
 		register_annotation(MethodInfo("@abstract"), AnnotationInfo::SCRIPT | AnnotationInfo::CLASS | AnnotationInfo::FUNCTION, &GDScriptParser::abstract_annotation);
 		// Onready annotation.
 		register_annotation(MethodInfo("@onready"), AnnotationInfo::VARIABLE, &GDScriptParser::onready_annotation);
+		register_annotation(MethodInfo("@sync_property", PropertyInfo(Variant::STRING, "authority"), PropertyInfo(Variant::STRING, "sync")), AnnotationInfo::VARIABLE, &GDScriptParser::sync_property_annotation, varray("authority", "sync_on_set"));
 		// Export annotations.
 		register_annotation(MethodInfo("@export"), AnnotationInfo::VARIABLE, &GDScriptParser::export_annotations<PROPERTY_HINT_NONE, Variant::NIL>);
 		register_annotation(MethodInfo("@export_enum", PropertyInfo(Variant::STRING, "names")), AnnotationInfo::VARIABLE, &GDScriptParser::export_annotations<PROPERTY_HINT_ENUM, Variant::NIL>, varray(), true);
@@ -4544,6 +4545,53 @@ bool GDScriptParser::onready_annotation(AnnotationNode *p_annotation, Node *p_ta
 	}
 	variable->onready = true;
 	current_class->onready_used = true;
+	return true;
+}
+
+bool GDScriptParser::sync_property_annotation(AnnotationNode *p_annotation, Node *p_target, ClassNode *p_class) {
+	ERR_FAIL_COND_V_MSG(p_target->type != Node::VARIABLE, false, R"("@sync_property" annotation can only be applied to class variables.)");
+
+	if (current_class && !ClassDB::is_parent_class(current_class->get_datatype().native_type, SNAME("Node"))) {
+		push_error(R"("@sync_property" can only be used in classes that inherit "Node".)", p_annotation);
+		return false;
+	}
+
+	VariableNode *variable = static_cast<VariableNode *>(p_target);
+	if (variable->is_static) {
+		push_error(R"("@sync_property" annotation cannot be applied to a static variable.)", p_annotation);
+		return false;
+	}
+	if (variable->sync_authority != VariableNode::SYNC_AUTHORITY_NONE || variable->sync_behavior != VariableNode::SYNC_BEHAVIOR_NONE) {
+		push_error(R"("@sync_property" annotation can only be used once per variable.)", p_annotation);
+		return false;
+	}
+
+	ERR_FAIL_COND_V_MSG(p_annotation->resolved_arguments.size() > 2, false, R"("@sync_property" annotation accepts at most 2 arguments.)");
+
+	String authority = "authority";
+	if (p_annotation->resolved_arguments.size() >= 1) {
+		authority = p_annotation->resolved_arguments[0];
+	}
+	if (authority == "server" || authority == "host") {
+		variable->sync_authority = VariableNode::SYNC_AUTHORITY_SERVER;
+	} else if (authority == "authority") {
+		variable->sync_authority = VariableNode::SYNC_AUTHORITY_OWNER;
+	} else {
+		push_error(R"(Invalid "@sync_property" authority. Must be "host", "server", or "authority".)", p_annotation);
+		return false;
+	}
+
+	String sync_behavior = "sync_on_set";
+	if (p_annotation->resolved_arguments.size() >= 2) {
+		sync_behavior = p_annotation->resolved_arguments[1];
+	}
+	if (sync_behavior == "sync_on_set") {
+		variable->sync_behavior = VariableNode::SYNC_BEHAVIOR_ON_SET;
+	} else {
+		push_error(R"(Invalid "@sync_property" sync mode. Currently only "sync_on_set" is supported.)", p_annotation);
+		return false;
+	}
+
 	return true;
 }
 

@@ -54,6 +54,7 @@
 #include "core/config/project_settings.h"
 #include "core/core_constants.h"
 #include "core/io/file_access.h"
+#include "scene/main/node.h"
 #include "scene/resources/packed_scene.h"
 #include "scene/scene_string_names.h"
 
@@ -156,6 +157,7 @@ GDScriptInstance *GDScript::_create_instance(const Variant **p_args, int p_argco
 
 	GDScriptInstance *instance = memnew(GDScriptInstance);
 	instance->members.resize(member_indices.size());
+	instance->member_syncers.resize(member_indices.size());
 	instance->script = Ref<GDScript>(this);
 	instance->owner = p_owner;
 	instance->owner_id = p_owner->get_instance_id();
@@ -1551,9 +1553,18 @@ bool GDScriptInstance::set(const StringName &p_name, const Variant &p_value) {
 				const Variant *args = &value;
 				Callable::CallError err;
 				callp(member->setter, &args, 1, err);
-				return err.error == Callable::CallError::CALL_OK;
+				if (err.error == Callable::CallError::CALL_OK) {
+					if (member->sync_behavior == GDScript::MemberInfo::SYNC_BEHAVIOR_ON_SET) {
+						_sync_member_by_index(member->index);
+					}
+					return true;
+				}
+				return false;
 			} else {
 				members.write[member->index] = value;
+				if (member->sync_behavior == GDScript::MemberInfo::SYNC_BEHAVIOR_ON_SET) {
+					_sync_member_by_index(member->index);
+				}
 				return true;
 			}
 		}
@@ -1945,11 +1956,74 @@ void GDScriptInstance::_call_implicit_ready_recursively(GDScript *p_script) {
 	}
 }
 
+bool GDScriptInstance::_ensure_sync_member_registered(int p_index) {
+	if (!script.is_valid() || p_index < 0 || p_index >= script->member_info_by_index.size() || p_index >= member_syncers.size()) {
+		return false;
+	}
+
+	const GDScript::MemberInfo &member = script->member_info_by_index[p_index];
+	if (member.sync_behavior == GDScript::MemberInfo::SYNC_BEHAVIOR_NONE) {
+		return false;
+	}
+
+	Node *node = Object::cast_to<Node>(owner);
+	if (node == nullptr || !node->has_meta("_net_id")) {
+		return false;
+	}
+
+	Variant &syncer_cache = member_syncers.write[p_index];
+	Object *syncer = syncer_cache.get_type() == Variant::OBJECT ? syncer_cache.operator Object *() : nullptr;
+	if (syncer != nullptr) {
+		return true;
+	}
+
+	Engine *engine = Engine::get_singleton();
+	if (engine == nullptr || !engine->has_singleton("YNet")) {
+		return false;
+	}
+
+	Object *ynet = engine->get_singleton_object("YNet");
+	if (ynet == nullptr) {
+		return false;
+	}
+
+	const int authority = member.sync_authority == GDScript::MemberInfo::SYNC_AUTHORITY_SERVER ? 1 : node->get_multiplayer_authority();
+	const int sync_type = 0; // YNet::SYNC_MANUAL
+	Variant node_arg = node;
+	Variant property_arg = NodePath(String(member.property_info.name));
+	Variant authority_arg = authority;
+	Variant sync_type_arg = sync_type;
+	const Variant *args[4] = { &node_arg, &property_arg, &authority_arg, &sync_type_arg };
+	Callable::CallError err;
+	Variant syncer_result = ynet->callp(SNAME("register_sync_property"), args, 4, err);
+	if (err.error != Callable::CallError::CALL_OK || syncer_result.get_type() != Variant::OBJECT) {
+		return false;
+	}
+
+	syncer_cache = syncer_result;
+	syncer = syncer_result.operator Object *();
+	return syncer != nullptr;
+}
+
+void GDScriptInstance::_register_annotated_sync_members() {
+	if (!script.is_valid()) {
+		return;
+	}
+
+	for (int i = 0; i < script->member_info_by_index.size(); i++) {
+		const GDScript::MemberInfo &member = script->member_info_by_index[i];
+		if (member.sync_behavior != GDScript::MemberInfo::SYNC_BEHAVIOR_NONE) {
+			_ensure_sync_member_registered(i);
+		}
+	}
+}
+
 Variant GDScriptInstance::callp(const StringName &p_method, const Variant **p_args, int p_argcount, Callable::CallError &r_error) {
 	GDScript *sptr = script.ptr();
 	if (unlikely(p_method == SceneStringName(_ready))) {
 		// Call implicit ready first, including for the super classes recursively.
 		_call_implicit_ready_recursively(sptr);
+		_register_annotated_sync_members();
 	}
 	while (sptr) {
 		if (likely(sptr->valid)) {
@@ -2053,6 +2127,8 @@ void GDScriptInstance::reload_members() {
 
 	//apply
 	members = new_members;
+	member_syncers.clear();
+	member_syncers.resize(script->member_indices.size());
 
 	//pass the values to the new indices
 	member_indices_cache.clear();
@@ -2061,6 +2137,25 @@ void GDScriptInstance::reload_members() {
 	}
 
 #endif
+}
+
+bool GDScriptInstance::_sync_member_by_index(int p_index) {
+	if (!_ensure_sync_member_registered(p_index)) {
+		return false;
+	}
+
+	const GDScript::MemberInfo &member = script->member_info_by_index[p_index];
+	Node *node = Object::cast_to<Node>(owner);
+	Variant &syncer_cache = member_syncers.write[p_index];
+	Object *syncer = syncer_cache.get_type() == Variant::OBJECT ? syncer_cache.operator Object *() : nullptr;
+
+	if (syncer == nullptr) {
+		return false;
+	}
+
+	Callable::CallError err;
+	syncer->callp(SNAME("sync_property"), nullptr, 0, err);
+	return err.error == Callable::CallError::CALL_OK;
 }
 
 GDScriptInstance::~GDScriptInstance() {
