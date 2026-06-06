@@ -1597,6 +1597,7 @@ void RendererCanvasRenderRD::CanvasShaderData::set_code(const String &p_code) {
 	if (version.is_null()) {
 		version = canvas_singleton->shader.canvas_shader.version_create(false);
 	}
+	canvas_singleton->shader.canvas_shader.version_set_debug_label(version, path.is_empty() ? "<anonymous canvas shader>" : path);
 
 #if 0
 	print_line("**compiling shader:");

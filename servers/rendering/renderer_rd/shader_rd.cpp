@@ -41,6 +41,18 @@
 
 #define ENABLE_SHADER_CACHE 1
 
+static bool _shader_rd_should_log_compilation() {
+	return true;
+}
+
+static String _shader_rd_get_variant_label(const String &p_name, uint32_t p_variant, const String &p_debug_label) {
+	String label = p_name + ":" + itos(p_variant);
+	if (!p_debug_label.is_empty()) {
+		label += " for " + p_debug_label;
+	}
+	return label;
+}
+
 void ShaderRD::_add_stage(const char *p_code, StageType p_stage_type) {
 	Vector<String> lines = String(p_code).split("\n");
 
@@ -249,6 +261,14 @@ RID ShaderRD::version_create(bool p_embedded) {
 	return rid;
 }
 
+void ShaderRD::version_set_debug_label(RID p_version, const String &p_debug_label) {
+	Version *version = version_owner.get_or_null(p_version);
+	ERR_FAIL_NULL(version);
+
+	MutexLock lock(*version->mutex);
+	version->debug_label = p_debug_label;
+}
+
 void ShaderRD::_initialize_version(Version *p_version) {
 	_clear_version(p_version);
 
@@ -409,11 +429,19 @@ void ShaderRD::_compile_variant(uint32_t p_variant, CompileData p_data) {
 		return; // Variant is disabled, return.
 	}
 
+	if (_shader_rd_should_log_compilation()) {
+		if (p_data.version->debug_label.is_empty()) {
+			print_line(vformat("Compiling Vulkan shader '%s' variant %d.", name, variant));
+		} else {
+			print_line(vformat("Compiling Vulkan shader '%s' variant %d for %s.", name, variant, p_data.version->debug_label));
+		}
+	}
+
 	Vector<String> variant_stage_sources = _build_variant_stage_sources(variant, p_data);
 	Vector<RD::ShaderStageSPIRVData> variant_stages = compile_stages(variant_stage_sources, dynamic_buffers);
 	ERR_FAIL_COND(variant_stages.is_empty());
 
-	Vector<uint8_t> shader_data = RD::get_singleton()->shader_compile_binary_from_spirv(variant_stages, name + ":" + itos(variant));
+	Vector<uint8_t> shader_data = RD::get_singleton()->shader_compile_binary_from_spirv(variant_stages, _shader_rd_get_variant_label(name, variant, p_data.version->debug_label));
 	ERR_FAIL_COND(shader_data.is_empty());
 
 	{
@@ -667,6 +695,13 @@ bool ShaderRD::_load_from_cache(Version *p_version, int p_group) {
 		if (!variants_enabled[variant_id]) {
 			p_version->variants.write[variant_id] = RID();
 			continue;
+		}
+		if (_shader_rd_should_log_compilation()) {
+			if (p_version->debug_label.is_empty()) {
+				print_line(vformat("Loading cached Vulkan shader '%s' variant %d.", name, variant_id));
+			} else {
+				print_line(vformat("Loading cached Vulkan shader '%s' variant %d for %s.", name, variant_id, p_version->debug_label));
+			}
 		}
 		print_verbose(vformat("Loading cache for shader %s, variant %d", name, i));
 		{

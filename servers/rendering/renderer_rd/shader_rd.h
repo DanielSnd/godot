@@ -85,6 +85,7 @@ private:
 
 		Vector<Vector<uint8_t>> variant_data;
 		Vector<RID> variants;
+		String debug_label;
 
 		bool valid;
 		bool dirty;
@@ -190,6 +191,7 @@ protected:
 
 public:
 	RID version_create(bool p_embedded = true);
+	void version_set_debug_label(RID p_version, const String &p_debug_label);
 
 	void version_set_code(RID p_version, const HashMap<String, String> &p_code, const String &p_uniforms, const String &p_vertex_globals, const String &p_fragment_globals, const Vector<String> &p_custom_defines);
 	void version_set_compute_code(RID p_version, const HashMap<String, String> &p_code, const String &p_uniforms, const String &p_compute_globals, const Vector<String> &p_custom_defines);

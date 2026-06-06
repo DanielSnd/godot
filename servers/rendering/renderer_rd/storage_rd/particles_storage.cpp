@@ -1783,6 +1783,7 @@ void ParticlesStorage::ParticlesShaderData::set_code(const String &p_code) {
 	} else {
 		pipeline.free();
 	}
+	particles_storage->particles_shader.shader.version_set_debug_label(version, path.is_empty() ? "<anonymous particle shader>" : path);
 
 	for (uint32_t i = 0; i < ParticlesShader::MAX_USERDATAS; i++) {
 		if (userdatas_used[i]) {

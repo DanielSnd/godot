@@ -112,6 +112,7 @@ void SkyRD::SkyShaderData::set_code(const String &p_code) {
 	if (version.is_null()) {
 		version = scene_singleton->sky.sky_shader.shader.version_create();
 	}
+	scene_singleton->sky.sky_shader.shader.version_set_debug_label(version, path.is_empty() ? "<anonymous sky shader>" : path);
 
 #if 0
 	print_line("**compiling shader:");

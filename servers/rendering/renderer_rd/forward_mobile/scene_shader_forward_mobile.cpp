@@ -180,6 +180,7 @@ void SceneShaderForwardMobile::ShaderData::set_code(const String &p_code) {
 	if (version.is_null()) {
 		version = SceneShaderForwardMobile::singleton->shader.version_create(false);
 	}
+	SceneShaderForwardMobile::singleton->shader.version_set_debug_label(version, path.is_empty() ? "<anonymous spatial shader>" : path);
 
 	depth_draw = DepthDraw(depth_drawi);
 	if (depth_test_disabledi) {

@@ -6083,6 +6083,7 @@ RDD::PipelineID RenderingDeviceDriverVulkan::render_pipeline_create(
 	// Finally, pipeline create info.
 
 	const ShaderInfo *shader_info = (const ShaderInfo *)p_shader.id;
+	print_line(vformat("Creating Vulkan graphics pipeline for %s.", String(shader_info->name.ptr())));
 
 	VkGraphicsPipelineCreateInfo pipeline_create_info = {};
 
@@ -6694,6 +6695,7 @@ void RenderingDeviceDriverVulkan::command_compute_dispatch_indirect(CommandBuffe
 
 RDD::PipelineID RenderingDeviceDriverVulkan::compute_pipeline_create(ShaderID p_shader, VectorView<PipelineSpecializationConstant> p_specialization_constants) {
 	const ShaderInfo *shader_info = (const ShaderInfo *)p_shader.id;
+	print_line(vformat("Creating Vulkan compute pipeline for %s.", String(shader_info->name.ptr())));
 
 	VkComputePipelineCreateInfo pipeline_create_info = {};
 	pipeline_create_info.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
