@@ -5269,6 +5269,14 @@ void Main::cleanup(bool p_force) {
 
 	WorkerThreadPool::get_singleton()->exit_languages_threads();
 
+	if (audio_server) {
+		// Audio playback teardown can release scripted stream resources, so it must
+		// happen before script languages are finalized.
+		audio_server->finish();
+		memdelete(audio_server);
+		audio_server = nullptr;
+	}
+
 	ScriptServer::finish_languages();
 
 	// Sync pending commands that may have been queued from a different thread during ScriptServer finalization
@@ -5325,11 +5333,6 @@ void Main::cleanup(bool p_force) {
 		memdelete(xr_server);
 	}
 #endif // XR_DISABLED
-
-	if (audio_server) {
-		audio_server->finish();
-		memdelete(audio_server);
-	}
 
 	if (camera_server) {
 		memdelete(camera_server);
