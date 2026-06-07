@@ -420,14 +420,15 @@ GDScriptCodeGenerator::Address GDScriptCompiler::_parse_expression(CodeGen &code
 						// If it's an autoload singleton, we postpone to load it at runtime.
 						// This is so one autoload doesn't try to load another before it's compiled.
 						HashMap<StringName, ProjectSettings::AutoloadInfo> autoloads(ProjectSettings::get_singleton()->get_autoload_list());
-						if (autoloads.has(identifier) && autoloads[identifier].is_singleton) {
-							GDScriptCodeGenerator::Address global = codegen.add_temporary(_gdtype_from_datatype(in->get_datatype(), codegen.script));
-							int idx = GDScriptLanguage::get_singleton()->get_global_map()[identifier];
-							gen->write_store_global(global, idx);
-							return global;
+						int idx = GDScriptLanguage::get_singleton()->get_global_map()[identifier];
+						Variant global = GDScriptLanguage::get_singleton()->get_global_array()[idx];
+						if ((autoloads.has(identifier) && autoloads[identifier].is_singleton) || global.get_type() == Variant::OBJECT) {
+							// Live object singletons must be loaded at runtime instead of being folded
+							// into compile-time constants, which can touch thread-guarded objects.
+							GDScriptCodeGenerator::Address global_addr = codegen.add_temporary(_gdtype_from_datatype(in->get_datatype(), codegen.script));
+							gen->write_store_global(global_addr, idx);
+							return global_addr;
 						} else {
-							int idx = GDScriptLanguage::get_singleton()->get_global_map()[identifier];
-							Variant global = GDScriptLanguage::get_singleton()->get_global_array()[idx];
 							return codegen.add_constant(global);
 						}
 					}

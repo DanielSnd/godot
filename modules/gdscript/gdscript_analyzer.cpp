@@ -1035,6 +1035,10 @@ void GDScriptAnalyzer::resolve_class_member(GDScriptParser::ClassNode *p_class, 
 		if (member_node && member_node->type != GDScriptParser::Node::ANNOTATION) {
 			// Apply @warning_ignore annotations before resolving member.
 			for (GDScriptParser::AnnotationNode *&E : member_node->annotations) {
+				if (E == nullptr) {
+					push_error("Could not resolve class member: encountered a null annotation.", p_source);
+					continue;
+				}
 				if (E->name == SNAME("@warning_ignore")) {
 					resolve_annotation(E);
 					E->apply(parser, member.variable, p_class);
@@ -1044,6 +1048,11 @@ void GDScriptAnalyzer::resolve_class_member(GDScriptParser::ClassNode *p_class, 
 #endif // DEBUG_ENABLED
 		switch (member.type) {
 			case GDScriptParser::ClassNode::Member::VARIABLE: {
+				if (member.variable == nullptr) {
+					push_error("Could not resolve class member: variable member is null.", p_source);
+					break;
+				}
+
 				bool previous_static_context = static_context;
 				static_context = member.variable->is_static;
 
@@ -1055,6 +1064,10 @@ void GDScriptAnalyzer::resolve_class_member(GDScriptParser::ClassNode *p_class, 
 
 				// Apply annotations.
 				for (GDScriptParser::AnnotationNode *&E : member.variable->annotations) {
+					if (E == nullptr) {
+						push_error("Could not resolve variable annotation: encountered a null annotation.", member.variable);
+						continue;
+					}
 					if (E->name != SNAME("@warning_ignore")) {
 						resolve_annotation(E);
 						E->apply(parser, member.variable, p_class);
@@ -1107,17 +1120,31 @@ void GDScriptAnalyzer::resolve_class_member(GDScriptParser::ClassNode *p_class, 
 #endif // DEBUG_ENABLED
 			} break;
 			case GDScriptParser::ClassNode::Member::CONSTANT: {
+				if (member.constant == nullptr) {
+					push_error("Could not resolve class member: constant member is null.", p_source);
+					break;
+				}
+
 				check_class_member_name_conflict(p_class, member.constant->identifier->name, member.constant);
 				member.constant->set_datatype(resolving_datatype);
 				resolve_constant(member.constant, false);
 
 				// Apply annotations.
 				for (GDScriptParser::AnnotationNode *&E : member.constant->annotations) {
+					if (E == nullptr) {
+						push_error("Could not resolve constant annotation: encountered a null annotation.", member.constant);
+						continue;
+					}
 					resolve_annotation(E);
 					E->apply(parser, member.constant, p_class);
 				}
 			} break;
 			case GDScriptParser::ClassNode::Member::SIGNAL: {
+				if (member.signal == nullptr) {
+					push_error("Could not resolve class member: signal member is null.", p_source);
+					break;
+				}
+
 				check_class_member_name_conflict(p_class, member.signal->identifier->name, member.signal);
 
 				member.signal->set_datatype(resolving_datatype);
@@ -1143,11 +1170,20 @@ void GDScriptAnalyzer::resolve_class_member(GDScriptParser::ClassNode *p_class, 
 
 				// Apply annotations.
 				for (GDScriptParser::AnnotationNode *&E : member.signal->annotations) {
+					if (E == nullptr) {
+						push_error("Could not resolve signal annotation: encountered a null annotation.", member.signal);
+						continue;
+					}
 					resolve_annotation(E);
 					E->apply(parser, member.signal, p_class);
 				}
 			} break;
 			case GDScriptParser::ClassNode::Member::ENUM: {
+				if (member.m_enum == nullptr) {
+					push_error("Could not resolve class member: enum member is null.", p_source);
+					break;
+				}
+
 				check_class_member_name_conflict(p_class, member.m_enum->identifier->name, member.m_enum);
 
 				member.m_enum->set_datatype(resolving_datatype);
@@ -1198,12 +1234,25 @@ void GDScriptAnalyzer::resolve_class_member(GDScriptParser::ClassNode *p_class, 
 
 				// Apply annotations.
 				for (GDScriptParser::AnnotationNode *&E : member.m_enum->annotations) {
+					if (E == nullptr) {
+						push_error("Could not resolve enum annotation: encountered a null annotation.", member.m_enum);
+						continue;
+					}
 					resolve_annotation(E);
 					E->apply(parser, member.m_enum, p_class);
 				}
 			} break;
 			case GDScriptParser::ClassNode::Member::FUNCTION:
+				if (member.function == nullptr) {
+					push_error("Could not resolve class member: function member is null.", p_source);
+					break;
+				}
+
 				for (GDScriptParser::AnnotationNode *&E : member.function->annotations) {
+					if (E == nullptr) {
+						push_error("Could not resolve function annotation: encountered a null annotation.", member.function);
+						continue;
+					}
 					resolve_annotation(E);
 					E->apply(parser, member.function, p_class);
 				}
@@ -1247,6 +1296,11 @@ void GDScriptAnalyzer::resolve_class_member(GDScriptParser::ClassNode *p_class, 
 				member.enum_value.identifier->set_datatype(make_class_enum_type(UNNAMED_ENUM, p_class, parser->script_path, false));
 			} break;
 			case GDScriptParser::ClassNode::Member::CLASS:
+				if (member.m_class == nullptr) {
+					push_error("Could not resolve class member: nested class member is null.", p_source);
+					break;
+				}
+
 				check_class_member_name_conflict(p_class, member.m_class->identifier->name, member.m_class);
 				// If it's already resolving, that's ok.
 				if (!member.m_class->base_type.is_resolving()) {
